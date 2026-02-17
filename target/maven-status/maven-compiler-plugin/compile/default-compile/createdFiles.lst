@@ -1,0 +1,16 @@
+com\app\residencia\resources\JakartaEE8Resource.class
+com\app\residencia\HouseServlet$HouseRequest.class
+com\app\residencia\ProfileServlet.class
+com\app\residencia\WalletServlet$UserCota.class
+com\app\residencia\WalletServlet.class
+com\app\residencia\RegisterServlet.class
+com\app\residencia\ChatWebSocket.class
+com\app\residencia\JakartaRestConfiguration.class
+com\app\residencia\ProfileServlet$ProfileRequest.class
+com\app\residencia\WalletServlet$TransactionRequest.class
+com\app\dto\DatabaseManager.class
+com\app\residencia\LoginServlet$UserLogin.class
+com\app\residencia\HouseServlet.class
+com\app\residencia\RegisterServlet$FullRegistrationData.class
+com\app\residencia\AppShutdownListener.class
+com\app\residencia\LoginServlet.class

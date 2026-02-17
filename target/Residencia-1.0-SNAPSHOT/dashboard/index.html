@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Matrix OS | Dashboard</title>
+        <link rel="stylesheet" href="style_dashboard.css">
+    </head>
+    <body>
+
+        <div class="dashboard-container">
+
+            <aside class="sidebar">
+                <div class="user-profile">
+                    <div class="avatar-circle">
+                        <span id="dash-user-initial">?</span>
+                    </div>
+                    <h3 id="dash-user-name">Carregando...</h3>
+                    <span id="dash-user-role" class="role-badge">...</span>
+                </div>
+
+                <nav class="dash-nav">
+                    <button class="nav-item active" onclick="loadModule('HOME')">
+                        <span class="icon">🏠</span> Visão Geral
+                    </button>
+                    <button class="nav-item" onclick="loadModule('PROFILE')">
+                        <span class="icon">👤</span> Meu Perfil
+                    </button>
+                    <button class="nav-item" onclick="loadModule('WALLET')">
+                        <span class="icon">📊</span> Despesas
+                    </button>
+                    <button class="nav-item" onclick="loadModule('TASKS')">
+                        <span class="icon">🧹</span> Tarefas
+                    </button>
+                </nav>
+
+                <div class="logout-area">
+                    <button class="btn-logout" onclick="logoutSistema()">
+                        [ SAIR DO SISTEMA ]
+                    </button>
+                </div>
+            </aside>
+
+            <div class="sidebar-divider" onclick="toggleNav()" title="Ocultar/Mostrar Menu">
+                <span id="divider-icon-arrow" class="divider-icon">◀</span>
+            </div>
+
+            <main class="dash-content">
+
+                <header class="dash-header">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button class="btn-mobile-menu" onclick="toggleNav()" title="Abrir Menu">☰</button>
+                        <div class="house-info">
+                            <div class="host-line">
+                                <span class="label-muted">HOST //</span> 
+                                <span id="dash-house-name" class="host-name">...</span>
+                            </div>
+
+                            <div class="invite-box" onclick="copiarCodigo()" title="Copiar para a Área de Transferência">
+                                <span class="label">ACESSO:</span>
+                                <span id="dash-invite-code" class="code">...</span>
+                                <span class="copy-hint">[ COPIAR ]</span>
+                            </div>
+                        </div>
+                        <div class="system-status" onclick="toggleChat()" title="Abrir Terminal de Comunicações">
+                            <span class="blink">●</span>ONLINE
+                        </div>
+                </header>
+
+                <div id="module-home" class="widgets-grid">
+
+                    <div class="widget-card">
+                        <div class="widget-header"><h3>Resumo Financeiro (Mês)</h3></div>
+                        <div class="widget-body">
+                            <h1 id="home-gasto-mensal" class="balance-value" style="color: #00ff00;">R$ 0,00</h1>
+                            <p id="home-status" class="status-ok" style="font-family: monospace;">Sincronizando...</p>
+                        </div>
+                    </div>
+
+                    <div class="widget-card">
+                        <div class="widget-header"><h3>Sua Missão</h3></div>
+                        <div class="widget-body">
+                            <h2 style="color: #fff;">Sem tarefas</h2>
+                        </div>
+                    </div>
+
+                    <div class="widget-card alert-card" style="grid-column: span 2;">
+                        <div class="widget-header"><h3>⚠️ SYSTEM ALERT: VENCIMENTOS</h3></div>
+                        <div class="widget-body">
+                            <ul id="home-upcoming-bills" style="list-style: none; padding: 0; margin: 0;">
+                                <li class="bill-item upcoming">
+                                    <span class="bill-badge badge-green">[ OK ]</span>
+                                    <span class="bill-title">Buscando registros na Matrix...</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="widget-card" style="grid-column: span 2;">
+                        <div class="widget-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3>👥 Moradores & Contribuições</h3>
+
+                            <select id="filter-members-time" class="matrix-input-field" style="width: auto; padding: 2px 10px; margin: 0; font-size: 0.8em;" onchange="renderizarMembrosCasa(this.value)">
+                                <option value="MONTH" selected>Este Mês</option>
+                                <option value="DAY">Hoje</option>
+                                <option value="YEAR">Este Ano</option>
+                                <option value="ALL">Desde o Início</option>
+                            </select>
+                        </div>
+                        <div class="widget-body">
+                            <div id="home-members-list" class="members-grid">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div id="module-wallet" class="hidden module-container">
+
+                    <div class="wallet-header">
+                        <h2><span class="blink">█</span> SYS_FINANCE // REGISTRO DE DESPESAS</h2>
+                        <p>>_ Controle de gastos e pendências da residência.</p>
+                    </div>
+
+                    <div class="wallet-summary">
+                        <div class="summary-card box-glow-green">
+                            <h3>Gasto Mensal (Pagos)</h3>
+                            <h1 id="wallet-balance" class="value-green">R$ 0,00</h1>
+                        </div>
+                        <div class="summary-card box-glow-red">
+                            <h3>Contas Pendentes</h3>
+                            <h1 id="wallet-pending" class="value-red">R$ 0,00</h1>
+                        </div>
+                    </div>
+
+                    <div class="wallet-actions">
+                        <button class="btn-matrix" style="width: 100%;" onclick="abrirModalTransacao()">
+                            [ + REGISTRAR COMPRA OU CONTA ]
+                        </button>
+                    </div>
+
+                    <div class="transaction-history">
+                        <h3>Histórico Geral</h3>
+
+                        <div class="table-filters">
+                            <input type="text" id="filter-search" class="matrix-input-field filter-input" placeholder="Pesquisar Descrição ou NF..." oninput="aplicarFiltros()">
+
+                            <select id="filter-operator" class="matrix-input-field filter-input" onchange="aplicarFiltros()">
+                                <option value="ALL">Todos os Moradores</option>
+                                <option value="ME">Apenas Eu</option>
+                            </select>
+
+                            <select id="filter-status" class="matrix-input-field filter-input" onchange="aplicarFiltros()">
+                                <option value="ALL">Todos os Status</option>
+                                <option value="PAID">Pagos</option>
+                                <option value="PENDING">Pendentes</option>
+                                <option value="OVERDUE" style="color:#ff0000; font-weight:bold;">Atrasadas ⚠️</option>
+                                <option value="CANCELED">Cancelados</option>
+                            </select>
+
+                            <select id="filter-date" class="matrix-input-field filter-input" onchange="aplicarFiltros()">
+                                <option value="DESC">Data: Mais Recentes</option>
+                                <option value="ASC">Data: Mais Antigas</option>
+                            </select>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="matrix-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Operador</th>
+                                        <th>Descrição</th>
+                                        <th>Valor</th>
+                                        <th>Vencimento</th>
+                                        <th>Chave NF</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transaction-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="module-profile" class="hidden module-container">
+                    <div class="wallet-header">
+                        <h2><span class="icon">👤</span> Identidade do Operador</h2>
+                        <p>Atualize seus dados de comunicação e chave de transferência.</p>
+                    </div>
+
+                    <div class="widget-card" style="max-width: 500px;">
+                        <form id="form-profile" onsubmit="salvarPerfil(event)">
+                            <div class="input-group">
+                                <label>Nome Completo</label>
+                                <input type="text" id="prof-name" class="matrix-input-field" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Telefone / WhatsApp</label>
+                                <input type="text" id="prof-phone" class="matrix-input-field" placeholder="(11) 99999-9999">
+                            </div>
+                            <div class="input-group">
+                                <label>Chave PIX (Para receber transferências)</label>
+                                <input type="text" id="prof-pix" class="matrix-input-field" placeholder="CPF, Email, Telefone ou Aleatória">
+                            </div>
+
+                            <button type="submit" class="btn-matrix" style="width: 100%; border-color: #00ff00; color: #00ff00;">
+                                [ ATUALIZAR REGISTROS ]
+                            </button>
+                        </form>
+
+                        <div class="danger-zone" style="margin-top: 50px; border-top: 1px dashed #ff0000; padding-top: 20px;">
+                            <h3 style="color: #ff0000; font-family: monospace; margin-bottom: 5px;">⚠️ ZONA DE RISCO</h3>
+                            <p style="color: #888; font-size: 0.85em; margin-bottom: 15px;">
+                                Cuidado: Esta ação é irreversível. Seu acesso, histórico de pagamentos e despesas atreladas a você serão desintegrados do servidor.
+                            </p>
+                            <button class="btn-matrix" style="background: rgba(255,0,0,0.1); color: #ff0000; border: 1px solid #ff0000;" onclick="abrirModalPerigo()">
+                                [ DELETAR MINHA CONTA ]
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="module-tasks" class="hidden"><h2>Tarefas (Em breve)</h2></div>
+
+
+            </main>
+        </div>
+
+        <div id="modal-transaction" class="matrix-overlay hidden">
+            <div class="matrix-window">
+                <div class="window-header">
+                    <span class="blink">█</span> <span id="trans-modal-title">REGISTRAR DESPESA</span>
+                </div>
+                <div class="window-content">
+                    <form id="form-transaction" onsubmit="salvarTransacao(event)">
+                        <input type="hidden" id="trans-id" value="">
+                        <div class="input-group">
+                            <label>Descrição (Ex: Mercado, Luz, Aluguel)</label>
+                            <input type="text" id="trans-desc" class="matrix-input-field" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Valor (R$)</label>
+                            <input type="number" id="trans-amount" step="0.01" min="0.01" class="matrix-input-field" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Data de Vencimento (Para Contas Básicas)</label>
+                            <input type="date" id="trans-due-date" class="matrix-input-field">
+                        </div>
+
+                        <div class="input-group">
+                            <label>Divisão da Despesa</label>
+                            <select id="trans-shared" class="matrix-input-field">
+                                <option value="false">Individual (Apenas minha cota)</option>
+                                <option value="true" style="color:#00ff00; font-weight:bold;">Dividida (Ratear valor total com a casa)</option>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Observação (Opcional)</label>
+                            <input type="text" id="trans-obs" class="matrix-input-field" placeholder="Ex: Referente ao mês de Janeiro...">
+                        </div>
+
+                        <div class="input-group">
+                            <label>Chave da Nota Fiscal (Opcional - Apenas números)</label>
+                            <input type="text" id="trans-nf" class="matrix-input-field" placeholder="Ex: 35210900...">
+                        </div>
+
+                        <div class="input-group" id="div-trans-status">
+                            <label>Status da Despesa</label>
+                            <select id="trans-status" class="matrix-input-field">
+                                <option value="PAID">Já Pago (Pago neste mês)</option>
+                                <option value="PENDING">Pendente (Vai pagar depois)</option>
+                            </select>
+                        </div>
+
+                        <div class="modal-actions" style="margin-top: 20px;">
+                            <button type="button" class="btn-matrix btn-cancel" onclick="fecharModalTransacao()">[ ABORT ]</button>
+                            <button type="submit" class="btn-matrix" style="color:#00ff00; border-color:#00ff00;">[ REGISTRAR ]</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-danger" class="matrix-overlay hidden">
+            <div class="matrix-window danger-theme">
+
+                <div class="window-header" style="border-bottom-color: #ff0000; display: flex; justify-content: space-between;">
+                    <div>
+                        <span class="blink" style="color:#ff0000;">█</span> 
+                        <span style="color: #ff0000; text-shadow: 0 0 10px rgba(255,0,0,0.5);">ALERTA CRÍTICO DE SISTEMA</span>
+                    </div>
+                    <button class="btn-close" onclick="fecharModalPerigo()" style="color: #ff0000; background: transparent; border: none; font-family: monospace; font-size: 1.2em; cursor: pointer; font-weight: bold;">[X]</button>
+                </div>
+
+                <div class="window-content" style="font-family: 'Courier New', monospace; color: #ffcccc;">
+                    <p>Você solicitou a <strong style="color:#ff0000;">DESINTEGRAÇÃO TOTAL</strong> do seu perfil.</p>
+                    <p style="margin-bottom: 20px;">Esta ação apagará sua existência nesta residência, incluindo todo o seu histórico financeiro. Não há volta.</p>
+
+                    <div style="border: 1px dashed #ff0000; padding: 15px; background: rgba(255,0,0,0.05); text-align: center;">
+                        <label style="color: #ff0000; font-size: 0.9em; display: block; margin-bottom: 15px;">Para confirmar, digite a palavra <strong>DESINTEGRAR</strong> abaixo:</label>
+                        <input type="text" id="danger-confirm-text" class="matrix-input-field" style="border-color: #ff0000; color: #ff0000; text-align: center; font-weight: bold; letter-spacing: 2px;" onkeyup="validarExclusao()" autocomplete="off" placeholder="_">
+                    </div>
+
+                    <div class="modal-actions" style="margin-top: 25px;">
+                        <button type="button" class="btn-matrix btn-cancel" onclick="fecharModalPerigo()" style="color:#888; border-color:#555;">[ ABORTAR ]</button>
+                        <button id="btn-confirm-delete" class="btn-matrix" style="background: rgba(255,0,0,0.1); color: #550000; border-color: #550000; cursor: not-allowed; transition: all 0.3s;" disabled onclick="executarExclusaoConta()">
+                            [ INICIAR SEQUÊNCIA ]
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-confirm" class="matrix-overlay hidden">
+            <div class="matrix-window" style="width: 400px; border-color: #00ff00;">
+                <div class="window-header" style="border-bottom-color: #00ff00;">
+                    <span class="blink">█</span> <span id="confirm-title">SYS_CONFIRM</span>
+                </div>
+                <div class="window-content" style="text-align: center;">
+                    <p id="confirm-message" style="margin-bottom: 25px; font-size: 1.1em; color: #ccc;"></p>
+
+                    <div class="action-buttons-container" style="justify-content: center; gap: 20px;">
+                        <button class="btn-matrix btn-cancel" onclick="fecharConfirmacao()">[ ABORTAR ]</button>
+                        <button id="btn-confirm-yes" class="btn-matrix" style="color: #00ff00; border-color: #00ff00; font-weight: bold;" onclick="confirmarAcaoTransacao()">
+                            [ CONFIRMAR ]
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-sidebar" class="chat-sidebar">
+            <div class="chat-header">
+                <span><span class="blink">█</span> SYS_COM_LINK</span>
+                <button onclick="toggleChat()" style="color:#00ff00; background:transparent; border:none; cursor:pointer; font-weight:bold; font-family:monospace;">[X]</button>
+            </div>
+
+            <div class="chat-online-users">
+                <h4 style="margin: 0 0 10px 0; color: #555; font-size: 0.85em; text-transform: uppercase;">Operadores na Residência</h4>
+                <ul id="online-users-list" style="list-style: none; padding: 0; margin: 0; font-family: monospace; font-size: 0.9em;">
+                    <li style="color: #00ff00; margin-bottom: 5px;">● Você</li>
+                    <li style="color: #ffaa00; margin-bottom: 5px;">● Moradores (Sincronizando...)</li>
+                </ul>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+                <div style="color: #666; font-size: 0.8em; text-align: center; margin-top: 10px; font-family: monospace;">
+                    >_ Conexão P2P estabelecida. O histórico de mensagens será criptografado.
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" class="matrix-input-field" placeholder="Transmitir mensagem..." onkeypress="if (event.key === 'Enter')
+                            enviarMensagemChat()">
+                <button class="btn-matrix" onclick="enviarMensagemChat()">[ > ]</button>
+            </div>
+        </div>
+
+        <script src="script_dashboard.js"></script>
+    </body>
+</html>

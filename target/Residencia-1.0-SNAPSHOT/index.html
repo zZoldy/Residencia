@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+    <head>
+        <meta charset='utf-8'>
+        <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+        <title>Landing Page</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="style_index.css">
+    </head>
+
+    <body>
+        <canvas id="matrix"></canvas>
+
+        <header>
+            <nav>
+                <a href="#" onclick="irParaHome(); return false;">Home</a>
+                <a href="#" onclick="irParaCadastro(); return false;">Cadastrar</a>
+                <a href="#" onclick="irParaSobre(); return false;">Sobre</a>
+            </nav>
+        </header>
+
+        <main>
+            <section id="home">
+                <div class="home-container">
+                    <div class="left-content">
+                        <div class="text-area">
+                            <h1>Divisão de contas e Organização</h1>
+                            <p>Gerencie sua residência com facilidade.</p>
+                        </div>
+
+                        <div class="carousel-wrapper">
+
+                            <button class="arrow-btn left" onclick="scrollCarousel(-1)">&#10094;</button>
+
+                            <div class="interactive-blocks" id="blocksContainer">
+
+                                <div class="block-item">
+                                    <img src="https://placehold.co/100x100/black/white?text=Finanças" alt="Icone 1">
+                                    <span>Pessoal</span>
+                                </div>
+
+                                <div class="block-item">
+                                    <img src="https://placehold.co/100x100/black/white?text=Finanças" alt="Icone 1">
+                                    <span>Residencial</span>
+                                </div>
+
+                                <div class="block-item">
+                                    <img src="https://placehold.co/100x100/black/white?text=Agenda" alt="Icone 2">
+                                    <span>Tarefas</span>
+                                </div>
+
+                                <div class="block-item">
+                                    <img src="https://placehold.co/100x100/black/white?text=Mercado" alt="Icone 3">
+                                    <span>Compras</span>
+                                </div>
+                            </div>
+
+                            <button class="arrow-btn right" onclick="scrollCarousel(1)">&#10095;</button>
+
+                        </div>
+                    </div>
+                    <div class="right-content">
+
+                        <section id="login">
+
+                            <div class="glass-panel">
+
+                                <div id="form-login" class="form-wrapper">
+                                    <h2>Bem-vindo</h2>
+                                    <p class="subtitle">Acesse sua conta</p>
+
+                                    <form onsubmit="performLogin(event)">
+                                        <div class="input-group">
+                                            <input type="email" placeholder="Email" required>
+                                        </div>
+                                        <div class="input-group">
+                                            <input type="password" placeholder="Senha" required>
+                                        </div>
+                                        <button type="submit" class="btn-action">Entrar</button>
+                                    </form>
+
+                                    <div class="form-footer">
+                                        <p>Não tem uma conta? <a href="#" onclick="toggleForms()">Cadastre-se</a></p>
+                                    </div>
+                                </div>
+
+                                <div id="form-register" class="form-wrapper hidden">
+                                    <h2>Nova Identidade</h2>
+                                    <p class="subtitle">Configuração: <span id="step-indicator" style="color: #00ff00;">Passo 1/2</span></p>
+
+                                    <form id="multi-step-form" onsubmit="finalizarCadastro(event)">
+
+                                        <div id="step-1">
+                                            <div class="input-group">
+                                                <input type="text" id="reg-name" placeholder="Nome Operador" required>
+                                            </div>
+                                            <div class="input-group">
+                                                <input type="email" id="reg-email" placeholder="Email" required>
+                                            </div>
+                                            <div class="input-group">
+                                                <input type="password" id="reg-pass" placeholder="Senha" required>
+                                            </div>
+                                            <div class="input-group">
+                                                <input type="password" id="reg-confirm" placeholder="Confirmar Senha" required>
+                                            </div>
+
+                                            <button type="button" class="btn-action" onclick="irParaPasso2()">
+                                                Prosseguir &nbsp; &#10140;
+                                            </button>
+                                        </div>
+
+                                        <div id="step-2" class="hidden">
+                                            <div class="input-group" style="margin-top: 20px;">
+                                                <input type="text" id="house-data-input" placeholder="Nome da República (Ex: Zion)">
+                                            </div>
+
+                                            <input type="hidden" id="house-action-type" value="CREATE">
+
+                                            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                                <button type="button" class="btn-action btn-secondary" onclick="voltarParaPasso1()">Voltar</button>
+                                                <button type="submit" class="btn-action">Inicializar Sistema</button>
+                                            </div>
+                                        </div>
+
+                                    </form>
+
+                                    <div class="form-footer">
+                                        <p>Já possui acesso? <a href="#" onclick="toggleForms()">Fazer Login</a></p>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </section>
+                    </div>
+
+
+                </div>
+            </section>
+
+            <section id="sobre" class="hidden">
+                <div class="glass-panel sobre-container">
+                    <div class="sobre-content">
+
+                        <div class="matrix-header">
+                            <span class="glitch-text">SYSTEM_ROOT://ABOUT</span>
+                        </div>
+
+                        <h2>Protocolo de Convivência</h2>
+
+                        <p class="lead">
+                            Viver em grupo não precisa ser um caos. Nosso sistema foi desenvolvido para
+                            <strong>decodificar</strong> a complexidade da convivência. <br>
+                            Centralizamos as finanças, automatizamos a escala de limpeza e sincronizamos
+                            o abastecimento em uma única interface.
+                        </p>
+
+                        <hr class="divider">
+
+                        <div class="features-grid">
+
+                            <div class="feature">
+                                <div class="icon-glow">💳</div>
+                                <h3>Carteira da Casa</h3>
+                                <p>
+                                    Esqueça o "quem deve pra quem". Aqui, a Residência é uma entidade.
+                                    Todos depositam no <strong>Caixa Único</strong> e o sistema paga as contas (Aluguel,
+                                    Luz, Net) automaticamente.
+                                </p>
+                            </div>
+
+                            <div class="feature">
+                                <div class="icon-glow">🧬</div>
+                                <h3>Escala Inteligente</h3>
+                                <p>
+                                    O algoritmo define quem lava a louça e quem limpa o banheiro.
+                                    Sem discussões, sem favoritismo. Apenas lógica.
+                                </p>
+                            </div>
+
+                            <div class="feature">
+                                <div class="icon-glow">🐾</div>
+                                <h3>Módulo Pet</h3>
+                                <p>
+                                    O mascote também é um morador. Controle o ciclo de <strong>alimentação</strong>,
+                                    vacinas e a escala de limpeza.
+                                    <br><strong>(Dono: Vinculado ao CPF
+                                        responsável)</strong>
+                                </p>
+                            </div>
+
+                            <div class="feature">
+                                <div class="icon-glow">📡</div>
+                                <h3>Upload de Suprimentos</h3>
+                                <p>
+                                    Lista de compras sincronizada em tempo real.
+                                    Acabou o detergente? Marcou, apareceu para todos.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button onclick="voltarParaHome()" class="btn-action btn-voltar">
+                            &lt; Voltar para o Sistema /&gt;
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Todos os direitos reservados</p>
+        </footer>
+
+        <div id="matrix-overlay" class="hidden">
+
+            <div id="modal-message" class="matrix-window hidden">
+                <div class="window-header">
+                    <span class="blink">█</span> SYSTEM_ALERT
+                </div>
+                <div class="window-content">
+                    <h3 id="msg-title" style="color: #00ff00;">TITLE</h3>
+                    <p id="msg-text">Message content...</p>
+                    <div id="msg-code-display" class="code-box hidden"></div> <button class="btn-matrix" onclick="fecharMatrixModal()">[ ACKNOWLEDGE ]</button>
+                </div>
+            </div>
+
+            <div id="modal-input" class="matrix-window hidden">
+                <div class="window-header">
+                    <span class="blink">?</span> SYSTEM_QUERY
+                </div>
+                <div class="window-content">
+                    <h3>Conflito de Identidade</h3>
+                    <p>A República <span id="conflict-house-name" style="color: #fff; font-weight: bold;"></span> já existe.</p>
+                    <p>Insira o código de acesso para se vincular:</p>
+
+                    <input type="text" id="matrix-input-code" placeholder="Ex: #ZION99" class="matrix-input-field">
+
+                    <div class="modal-actions">
+                        <button class="btn-matrix btn-cancel" onclick="cancelarEntrada()">[ ABORT ]</button>
+                        <button class="btn-matrix" onclick="confirmarEntrada()">[ PROCEED ]</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <script src="script_index.js"></script>
+
+    </body>
+
+</html>

@@ -1,0 +1,973 @@
+body {
+    margin: 0;
+    padding: 0;
+    background: #050505;
+    color: #ccc;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden; /* Evita barra de rolagem dupla */
+}
+
+/* === LAYOUT === */
+.dashboard-container {
+    display: flex;
+    height: 100vh; /* Fallback para navegadores muito antigos */
+    height: 100dvh; /* A mágica que foge da barra do Edge/Safari */
+    width: 100vw;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 260px;
+    background: #0a1a0a;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-shadow: 5px 0 15px rgba(0,255,0,0.05);
+    transition: width 0.3s ease, padding 0.3s ease;
+    overflow: hidden;
+    white-space: nowrap; /* Evita que o texto quebre ao encolher */
+}
+
+.sidebar.collapsed {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right: none;
+}
+
+/* =========================================
+   LINHA DIVISÓRIA INTERATIVA (TOGGLE)
+   ========================================= */
+.sidebar-divider {
+    width: 12px;
+    background: #050505;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 100;
+}
+
+/* Quando passa o mouse, a linha acende e mostra a seta */
+.sidebar-divider:hover {
+    background: rgba(0, 255, 0, 0.1);
+    box-shadow: inset 5px 0 15px rgba(0, 255, 0, 0.1);
+}
+
+.divider-icon {
+    color: #00ff00;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 14px;
+    opacity: 0; /* Seta invisível por padrão */
+    transition: opacity 0.3s;
+}
+
+.sidebar-divider:hover .divider-icon {
+    opacity: 1; /* Seta aparece no Hover */
+    text-shadow: 0 0 5px #00ff00;
+}
+
+.header-left-group {
+    display: flex;
+    align-items: center;
+}
+
+.user-profile {
+    text-align: center;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #004400;
+    margin-bottom: 20px;
+}
+
+.avatar-circle {
+    width: 70px;
+    height: 70px;
+    background: #00ff00;
+    color: #000;
+    border-radius: 50%;
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.role-badge {
+    background: #003300;
+    color: #00ff00;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    border: 1px solid #005500;
+}
+
+/* NAV */
+.nav-item {
+    background: transparent;
+    border: none;
+    color: #888;
+    width: 100%;
+    padding: 15px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    gap: 10px;
+    transition: 0.3s;
+    border-left: 3px solid transparent;
+}
+.nav-item:hover, .nav-item.active {
+    background: rgba(0, 255, 0, 0.1);
+    color: #fff;
+    border-left-color: #00ff00;
+}
+
+.btn-logout {
+    margin-top: auto;
+    width: 100%;
+    background: #220000;
+    color: #ff5555;
+    border: 1px solid #550000;
+    padding: 12px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.btn-logout:hover {
+    background: #ff0000;
+    color: #fff;
+}
+
+/* MAIN CONTENT */
+.dash-content {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+    background: radial-gradient(circle at top left, #112211, #000000);
+}
+
+.dash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 15px;
+}
+
+.invite-box {
+    cursor: pointer;
+    background: #000;
+    border: 1px dashed #444;
+    padding: 5px 10px;
+    display: inline-block;
+    margin-top: 5px;
+    color: #00ff00;
+    font-family: monospace;
+}
+.invite-box:hover {
+    border-color: #00ff00;
+}
+
+.widgets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+}
+
+.widget-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid #333;
+    padding: 20px;
+    border-radius: 8px;
+}
+.widget-card:hover {
+    border-color: #00ff00;
+}
+
+.widget-header h3 {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.balance-value {
+    color: #00ff00;
+    font-size: 2rem;
+    margin: 10px 0;
+}
+.hidden {
+    display: none !important;
+}
+.blink {
+    animation: blink 1s infinite;
+    color: #00ff00;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+/* =========================================
+   MÓDULO FINANCEIRO
+   ========================================= */
+.module-container {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* =========================================
+   HEADER: INFO DA CASA E CÓDIGO DE ACESSO
+   ========================================= */
+.house-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    margin-left: 10px;
+}
+
+.host-line {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.2rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.label-muted {
+    color: #447744;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+.host-name {
+    color: #00ff00;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
+    text-transform: uppercase;
+}
+
+/* Caixa interativa do código de convite */
+.invite-box {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0, 15, 0, 0.8);
+    border: 1px solid #004400;
+    padding: 3px 10px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'Courier New', Courier, monospace;
+    width: fit-content;
+}
+
+.invite-box.restricted {
+    cursor: default; /* Tira a mãozinha de clique */
+}
+
+/* Anula o brilho neon quando o membro passa o mouse */
+.invite-box.restricted:hover {
+    border-color: #004400;
+    background: rgba(0, 15, 0, 0.8);
+    box-shadow: none;
+}
+
+/* Deixa o texto "Restrito" cinza apagado */
+.invite-box.restricted .code {
+    color: #555;
+    text-shadow: none;
+}
+
+/* Esconde totalmente a dica "[ COPIAR ]" */
+.invite-box.restricted .copy-hint {
+    display: none !important;
+}
+
+.invite-box:hover {
+    border-color: #00ff00;
+    background: rgba(0, 40, 0, 0.9);
+    box-shadow: 0 0 12px rgba(0, 255, 0, 0.2);
+}
+
+.invite-box .label {
+    color: #666;
+    font-size: 0.75rem;
+    margin-right: 10px;
+}
+
+.invite-box .code {
+    color: #ffffff;
+    font-weight: bold;
+    letter-spacing: 2px;
+    font-size: 0.9rem;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+}
+
+/* O texto "[ COPIAR ]" fica invisível até passar o mouse */
+.copy-hint {
+    margin-left: 15px;
+    color: #00ffff; /* Ciano para dar destaque de ação */
+    font-size: 0.75rem;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.3s ease;
+}
+
+.invite-box:hover .copy-hint {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.wallet-header {
+    margin-bottom: 30px;
+    border-bottom: 1px solid #003300;
+    padding-bottom: 15px;
+    position: relative;
+}
+
+/* Cria uma linha neon curta que fica no canto esquerdo */
+.wallet-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 120px;
+    height: 2px;
+    background: #00ff00;
+    box-shadow: 0 0 10px #00ff00;
+}
+
+.wallet-header h2 {
+    font-family: 'Courier New', Courier, monospace;
+    color: #00ff00;
+    font-size: 1.5rem;
+    margin: 0 0 8px 0;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
+}
+
+.wallet-header p {
+    font-family: 'Courier New', Courier, monospace;
+    color: #666;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+/* CARDS DE RESUMO */
+.wallet-summary {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.summary-card {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 20px;
+    border: 1px solid #333;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.box-glow-green {
+    border-color: #00aa00;
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);
+}
+.box-glow-red {
+    border-color: #aa0000;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.1);
+}
+
+.value-green {
+    color: #00ff00;
+}
+.value-red {
+    color: #ff3333;
+}
+
+/* BOTÕES DE AÇÃO */
+.wallet-actions {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 40px;
+}
+
+.btn-matrix {
+    background: #002200;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-family: monospace;
+    transition: 0.3s;
+    font-weight: bold;
+    flex: 1;
+}
+/* Efeito de Hover Suavizado e Elegante */
+.btn-matrix:hover {
+    background: rgba(0, 255, 0, 0.15); /* Fundo verde quase transparente */
+    color: #00ff00; /* Mantém o texto verde */
+    box-shadow:
+        inset 0 0 10px rgba(0, 255, 0, 0.2), /* Brilho interno */
+        0 0 15px rgba(0, 255, 0, 0.3);       /* Brilho externo */
+    text-shadow: 0 0 5px #00ff00; /* Deixa a letra brilhando */
+}
+
+/* =========================================
+   BARRA DE FILTROS (HISTÓRICO)
+   ========================================= */
+.table-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    background: rgba(0, 20, 0, 0.4);
+    padding: 10px;
+    border: 1px dashed #004400;
+    flex-wrap: wrap; /* Em telas menores, joga os filtros para baixo */
+}
+
+.filter-input {
+    margin-bottom: 0; /* Remove a margem padrão do input matrix */
+    padding: 8px;
+    font-size: 0.85em;
+    flex: 1; /* Faz todos dividirem o espaço igualmente */
+    min-width: 150px;
+}
+
+/* O campo de pesquisa pode ser um pouquinho maior */
+#filter-search {
+    flex: 2;
+    min-width: 200px;
+}
+
+/* TABELA MATRIX */
+.table-responsive {
+    overflow-x: auto;
+    overflow-y: auto; /* Permite rolar a lista de contas para baixo */
+    max-height: 500px; /* Altura máxima da tabela antes de criar a barra de rolagem */
+    background: rgba(0, 20, 0, 0.4);
+    border: 1px solid #004400;
+    position: relative; /* Necessário para o cabeçalho fixo funcionar */
+}
+
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: monospace;
+    font-size: 0.95em;
+    table-layout: auto; /* Força o navegador a alinhar TH e TD perfeitamente */
+}
+
+.matrix-table th, .matrix-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #003300;
+}
+
+/* O PULO DO GATO: Cabeçalho Fixo (Sticky) */
+.matrix-table th {
+    background: #001500; /* Fundo sólido para as linhas não aparecerem por trás */
+    color: #00ff00;
+    text-transform: uppercase;
+    position: sticky; /* Cola o cabeçalho no topo */
+    top: 0; /* Distância do topo */
+    z-index: 10; /* Garante que fique acima dos outros dados */
+    box-shadow: 0 2px 5px rgba(0, 255, 0, 0.2); /* Sombra neon para separar do corpo */
+}
+
+.matrix-table tbody tr:hover {
+    background: rgba(0, 255, 0, 0.05);
+}
+/* ESTILOS DO MODAL DE TRANSAÇÃO */
+.matrix-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.matrix-window {
+    width: 450px;
+    background: #050505;
+    border: 1px solid #00ff00;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+}
+
+.window-header {
+    background: #002200;
+    padding: 10px;
+    border-bottom: 1px solid #00ff00;
+    font-weight: bold;
+    font-family: monospace;
+    color: #00ff00;
+}
+
+.window-content {
+    padding: 25px;
+}
+
+.input-group label {
+    display: block;
+    color: #888;
+    font-size: 0.85em;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+}
+
+.matrix-input-field {
+    width: 100%;
+    background: #000;
+    border: 1px solid #004400;
+    color: #00ff00;
+    padding: 10px;
+    margin-bottom: 15px;
+    font-family: monospace;
+    font-size: 1.1em;
+    outline: none;
+    box-sizing: border-box;
+}
+.matrix-input-field:focus {
+    border-color: #00ff00;
+}
+
+/* Força a coluna da Chave NF a quebrar a linha se for muito grande */
+.nf-key-cell {
+    max-width: 200px; /* Ajuste se necessário para caber na sua tela */
+    word-wrap: break-word;
+    word-break: break-all;
+    font-size: 0.85em;
+    color: #888;
+    display: inline-block; /* Necessário para o max-width funcionar no span */
+}
+
+/* Container para os botões de ação ficarem alinhados lado a lado */
+.action-buttons-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Base dos Botões de Ação na Tabela (Cyberpunk Style) */
+.btn-action-table {
+    background: #050505;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 0.8em;
+    padding: 5px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s ease-in-out;
+    border-radius: 2px;
+}
+
+/* Botão Pagar (Verde) */
+.btn-pay {
+    color: #00ff00;
+    border: 1px solid #005500;
+}
+.btn-pay:hover {
+    background: rgba(0, 255, 0, 0.1);
+    border-color: #00ff00;
+    box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
+}
+
+/* Botão Cancelar (Vermelho) */
+.btn-cancel-table {
+    color: #ff3333;
+    border: 1px solid #550000;
+}
+.btn-cancel-table:hover {
+    background: rgba(255, 0, 0, 0.1);
+    border-color: #ff3333;
+    box-shadow: 0 0 8px rgba(255, 0, 0, 0.4);
+}
+
+.btn-edit {
+    color: #00ffff;
+    border: 1px solid #005555;
+}
+.btn-edit:hover {
+    background: rgba(0, 255, 255, 0.1);
+    border-color: #00ffff;
+    box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+}
+
+/* =========================================
+   WIDGET: ALERTAS DE VENCIMENTO (MATRIX STYLE)
+   ========================================= */
+.alert-card {
+    border-color: #550000;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.1);
+}
+
+.alert-card .widget-header h3 {
+    color: #ff3333;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+        text-shadow: 0 0 8px #ff0000;
+    }
+    100% {
+        opacity: 0.7;
+    }
+}
+
+.bill-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.6);
+    border-left: 3px solid #333;
+    padding: 10px;
+    margin-bottom: 8px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    transition: 0.3s;
+}
+
+.bill-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.bill-item.overdue { /* Atrasada */
+    border-left-color: #ff0000;
+    background: rgba(255, 0, 0, 0.05);
+}
+
+.bill-item.today { /* Vence Hoje */
+    border-left-color: #ffaa00;
+    background: rgba(255, 170, 0, 0.05);
+}
+
+.bill-item.upcoming { /* No Prazo */
+    border-left-color: #00ff00;
+}
+
+.bill-badge {
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 0.8em;
+    margin-right: 10px;
+    background: #000;
+}
+
+.badge-red {
+    color: #ff0000;
+    border: 1px solid #ff0000;
+}
+.badge-yellow {
+    color: #ffaa00;
+    border: 1px solid #ffaa00;
+}
+.badge-green {
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+.bill-title {
+    flex: 1;
+    color: #ccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 10px;
+}
+
+.bill-amount {
+    font-weight: bold;
+}
+.bill-amount.red {
+    color: #ff3333;
+}
+.bill-amount.yellow {
+    color: #ffaa00;
+}
+.bill-amount.green {
+    color: #00ff00;
+}
+
+/* =========================================
+   WIDGET: MORADORES E CONTRIBUIÇÕES
+   ========================================= */
+.members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.member-card {
+    background: rgba(0, 10, 0, 0.5);
+    border: 1px solid #004400;
+    border-radius: 5px;
+    padding: 15px;
+    transition: 0.3s;
+}
+
+.member-card:hover {
+    border-color: #00ff00;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+}
+
+.member-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dashed #333;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+.member-name {
+    font-weight: bold;
+    color: #00ff00;
+    font-size: 1.1em;
+}
+
+.member-total {
+    font-family: monospace;
+    font-size: 1.1em;
+    color: #ccc;
+}
+
+.member-info {
+    font-size: 0.85em;
+    color: #888;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.member-info span.icon {
+    color: #555;
+}
+
+.danger-theme {
+    border: 2px solid #ff0000 !important;
+    box-shadow: 0 0 25px rgba(255, 0, 0, 0.2) !important;
+    background: #0a0000 !important;
+}
+
+.danger-theme .matrix-input-field:focus {
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5) !important;
+    outline: none;
+}
+
+/* =========================================
+   SISTEMA DE CHAT (COM-LINK)
+   ========================================= */
+
+/* Transforma o botão ONLINE em algo clicável */
+.system-status {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 5px 10px;
+}
+.system-status:hover {
+    border-color: #00ff00;
+    background: rgba(0, 255, 0, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+}
+
+/* A Barra Lateral do Chat (Escondida na direita) */
+.chat-sidebar {
+    position: fixed;
+    top: 0;
+    right: -350px; /* Esconde fora da tela */
+    width: 320px;
+    height: 100vh;
+    height: 100dvh;
+    background: rgba(0, 10, 0, 0.95);
+    border-left: 1px solid #00ff00;
+    box-shadow: -5px 0 20px rgba(0, 255, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s ease-in-out;
+    z-index: 3000;
+    backdrop-filter: blur(10px);
+}
+
+/* Classe ativada pelo JS para mostrar o chat */
+.chat-sidebar.open {
+    right: 0;
+}
+
+.chat-header {
+    padding: 15px;
+    background: #002200;
+    border-bottom: 1px solid #00ff00;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: monospace;
+    font-weight: bold;
+    color: #00ff00;
+}
+
+.chat-online-users {
+    padding: 15px;
+    background: rgba(0, 20, 0, 0.4);
+    border-bottom: 1px dashed #004400;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Balões de Mensagem */
+.chat-msg {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 2px;
+    font-size: 0.9em;
+    border-left: 3px solid #555;
+    color: #ccc;
+    width: 85%;
+}
+
+/* Minhas Mensagens (Ficam na direita e verdes) */
+.chat-msg.me {
+    background: rgba(0, 255, 0, 0.08);
+    border-left: none;
+    border-right: 3px solid #00ff00;
+    align-self: flex-end;
+    color: #00ff00;
+}
+
+.chat-msg .sender {
+    font-size: 0.75em;
+    color: #888;
+    display: block;
+    margin-bottom: 4px;
+    font-family: monospace;
+    text-transform: uppercase;
+}
+
+.chat-msg.me .sender {
+    color: #00aa00;
+    text-align: right;
+}
+
+.chat-input-area {
+    padding: 15px;
+    border-top: 1px solid #004400;
+    display: flex;
+    gap: 10px;
+    background: #050505;
+}
+
+.chat-input-area .matrix-input-field {
+    margin-bottom: 0; /* Remove a margem extra do input padrão */
+}
+
+/* Botão do Menu Mobile (Escondido no PC) */
+.btn-mobile-menu {
+    display: none;
+    background: #002200;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    padding: 8px 12px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    font-family: monospace;
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(0,255,0,0.2);
+}
+
+@media (max-width: 768px) {
+    /* 1. Transforma a Sidebar numa Gaveta Flutuante */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 2500; /* Fica acima de tudo, menos dos Modais */
+    }
+
+    /* 2. Oculta o divisor de arrastar do PC */
+    .sidebar-divider {
+        display: none !important;
+    }
+
+    /* 3. Mostra o Botão Hambúrguer */
+    .btn-mobile-menu {
+        display: block;
+    }
+
+    /* 4. Ajusta o Header para não quebrar */
+    .dash-header {
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .house-info {
+        margin-left: 0;
+    }
+
+    /* 5. Empilha os Cards e os Filtros */
+    .widgets-grid {
+        grid-template-columns: 1fr; /* 1 coluna só */
+    }
+
+    .wallet-summary {
+        flex-direction: column; /* Fica um em cima do outro */
+    }
+
+    .table-filters {
+        flex-direction: column;
+    }
+
+    .table-filters select, .table-filters input {
+        width: 100%;
+        flex: none;
+    }
+
+    /* 6. Ajusta o tamanho das Janelas Modais */
+    .matrix-window {
+        width: 95%;
+        max-width: 400px;
+    }
+}
