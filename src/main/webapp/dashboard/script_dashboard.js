@@ -25,6 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.innerWidth <= 768) {
         document.querySelector('.sidebar').classList.add('collapsed');
     }
+
+    iniciarComLink();
 });
 
 function carregarDadosUsuario() {
@@ -288,7 +290,38 @@ function aplicarFiltros() {
 
     // 4. Ordenação
     filtradas.sort((a, b) => {
-        return dateSort === 'ASC' ? a.id - b.id : b.id - a.id;
+        // Ordenação por Registo (Data de Criação baseada no ID)
+        if (dateSort === 'ASC')
+            return a.id - b.id;
+        if (dateSort === 'DESC')
+            return b.id - a.id;
+
+        // Ordenação por Vencimento
+        if (dateSort === 'DUE_ASC' || dateSort === 'DUE_DESC') {
+            // Se ambas não têm vencimento, desempata pelo ID
+            if (!a.due_date && !b.due_date)
+                return b.id - a.id;
+
+            // Joga as contas sem vencimento sempre para o final da lista
+            if (!a.due_date)
+                return 1;
+            if (!b.due_date)
+                return -1;
+
+            // Extrai as datas de forma limpa (YYY-MM-DD)
+            const dA = a.due_date.split(' ')[0];
+            const dB = b.due_date.split(' ')[0];
+
+            // Se vencem no mesmo dia, desempata pela mais recente
+            if (dA === dB)
+                return b.id - a.id;
+
+            if (dateSort === 'DUE_ASC') {
+                return dA < dB ? -1 : 1; // As que vencem primeiro (Mais próximas)
+            } else {
+                return dA > dB ? -1 : 1; // As que vencem por último (Mais distantes)
+            }
+        }
     });
 
     // ==========================================
@@ -937,56 +970,6 @@ async function confirmarAcaoTransacao() {
 }
 
 /* ==========================================================================
- SISTEMA DE CHAT / COM-LINK
- ========================================================================== */
-
-function toggleChat() {
-    const sidebar = document.getElementById('chat-sidebar');
-    if (sidebar) {
-        sidebar.classList.toggle('open');
-
-        // Se abriu o chat, já foca o cursor no campo de digitar
-        if (sidebar.classList.contains('open')) {
-            document.getElementById('chat-input').focus();
-        }
-    }
-}
-
-function enviarMensagemChat() {
-    const input = document.getElementById('chat-input');
-    const msg = input.value.trim();
-
-    if (!msg)
-        return; // Se estiver vazio, não faz nada
-
-    const chatBox = document.getElementById('chat-messages');
-
-    // Cria o balão da SUA mensagem
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'chat-msg me';
-    msgDiv.innerHTML = `<span class="sender">${user.name.split(' ')[0]}</span>${msg}`;
-
-    chatBox.appendChild(msgDiv);
-    input.value = ""; // Limpa o campo
-
-    // Rola o chat para a última mensagem lá embaixo
-    chatBox.scrollTop = chatBox.scrollHeight;
-
-    // ==========================================
-    // SIMULAÇÃO DO BANCO DE DADOS (EFEITO MATRIX)
-    // ==========================================
-    // Como ainda não temos o backend do chat em Java, o sistema responde sozinho!
-    setTimeout(() => {
-        const respDiv = document.createElement('div');
-        respDiv.className = 'chat-msg';
-        respDiv.innerHTML = `<span class="sender">Matrix_Sys</span>Mensagem registrada nos servidores da residência. Aguardando leitura dos outros moradores.`;
-
-        chatBox.appendChild(respDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }, 1500);
-}
-
-/* ==========================================================================
  SISTEMA DE CHAT P2P / ENCRIPTAÇÃO MATRIX / HISTÓRICO E ONLINE
  ========================================================================== */
 
@@ -1001,46 +984,6 @@ function decriptarMatrix(hash) {
     } catch (e) {
         return hash;
     }
-}
-
-function iniciarComLink() {
-    if (chatSocket || !user || !user.house_id)
-        return;
-
-    let basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/dashboard'));
-    let wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsUrl = `${wsProtocol}//${window.location.host}${basePath}/api/chat/${user.house_id}/${encodeURIComponent(user.name.split(' ')[0])}`;
-
-    chatSocket = new WebSocket(wsUrl);
-
-    chatSocket.onopen = function () {
-        console.log(">> COM-LINK ESTABELECIDO <<");
-        document.querySelector('.system-status').innerHTML = '<span class="blink" style="color:#00ff00;">●</span>ONLINE';
-    };
-
-    // === O CÉREBRO QUE SEPARA MENSAGENS, HISTÓRICO E USUÁRIOS ===
-    chatSocket.onmessage = function (event) {
-        const pacote = JSON.parse(event.data);
-
-        if (pacote.type === 'HISTORY') {
-            const chatBox = document.getElementById('chat-messages');
-            chatBox.innerHTML = '<div style="color: #666; font-size: 0.8em; text-align: center; margin-top: 10px; font-family: monospace;">>_ Recuperando banco de dados. Criptografia ativa.</div>';
-
-            pacote.messages.forEach(msg => {
-                desenharMensagem(msg.sender, msg.message);
-            });
-        } else if (pacote.type === 'MESSAGE') {
-            desenharMensagem(pacote.sender, pacote.message);
-        } else if (pacote.type === 'USERS') {
-            atualizarUsuariosOnline(pacote.list);
-        }
-    };
-
-    chatSocket.onclose = function () {
-        document.querySelector('.system-status').innerHTML = '<span class="blink" style="color:#ffaa00;">●</span> RECONECTANDO...';
-        chatSocket = null;
-        setTimeout(iniciarComLink, 5000);
-    };
 }
 
 // === DESENHA A LISTA DE QUEM ESTÁ ONLINE ===
@@ -1064,13 +1007,44 @@ function atualizarUsuariosOnline(listaUsuarios) {
     });
 }
 
+// === CONTROLE DE LEITURA (NÍVEL 2) ===
+let mensagensNaoLidas = 0;
+let maiorIdMensagemRecebido = 0; // Guarda o ID da última mensagem que chegou na tela
+
+function atualizarBadge() {
+    const badge = document.getElementById('chat-badge');
+    if (badge) {
+        if (mensagensNaoLidas > 0) {
+            badge.innerText = mensagensNaoLidas > 99 ? '99+' : mensagensNaoLidas;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+function marcarComoLido() {
+    // Só envia o aviso para o Java se tivermos mensagens e o socket estiver aberto
+    if (maiorIdMensagemRecebido > 0 && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+        chatSocket.send("MARK_READ:" + maiorIdMensagemRecebido);
+    }
+    mensagensNaoLidas = 0;
+    atualizarBadge();
+}
+
 function toggleChat() {
     const sidebar = document.getElementById('chat-sidebar');
     if (sidebar) {
         sidebar.classList.toggle('open');
+        
         if (sidebar.classList.contains('open')) {
             document.getElementById('chat-input').focus();
-            // Inicia apenas se não estiver conectado
+            
+            marcarComoLido(); // Avisa o Banco de Dados que lemos tudo!
+
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+
             if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
                 iniciarComLink();
             }
@@ -1103,4 +1077,116 @@ function desenharMensagem(remetente, msgCriptografada) {
     msgDiv.innerHTML = `<span class="sender">${remetente}</span>${msgLimpa}`;
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function iniciarComLink() {
+    if (chatSocket || !user || !user.house_id) return;
+
+    let basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/dashboard'));
+    let wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    
+    // MUDANÇA DE SEGURANÇA: Agora passamos user.id em vez do nome!
+    let wsUrl = `${wsProtocol}//${window.location.host}${basePath}/api/chat/${user.house_id}/${user.id}`;
+
+    chatSocket = new WebSocket(wsUrl);
+
+    const inputChat = document.getElementById('chat-input');
+    const btnChat = document.querySelector('.chat-input-area .btn-matrix');
+
+    chatSocket.onopen = function () {
+        console.log(">> COM-LINK ESTABELECIDO <<");
+        const statusIcon = document.getElementById('chat-status-icon');
+        const statusText = document.getElementById('chat-status-text');
+        
+        if (statusIcon && statusText) {
+            statusIcon.style.color = '#00ff00';
+            statusIcon.classList.add('blink');
+            statusText.innerHTML = '&nbsp;ONLINE';
+        }
+
+        if (inputChat && btnChat) {
+            inputChat.disabled = false;
+            btnChat.disabled = false;
+            inputChat.placeholder = "Transmitir mensagem...";
+            inputChat.style.opacity = "1";
+            btnChat.style.opacity = "1";
+            btnChat.style.cursor = "pointer";
+        }
+
+        chatSocket.pingInterval = setInterval(() => {
+            if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.send("SYS_PING");
+        }, 5000);
+    };
+
+    chatSocket.onmessage = function (event) {
+        const pacote = JSON.parse(event.data);
+        const sidebar = document.getElementById('chat-sidebar');
+        const isChatOpen = sidebar && sidebar.classList.contains('open');
+
+        if (pacote.type === 'HISTORY') {
+            const chatBox = document.getElementById('chat-messages');
+            chatBox.innerHTML = '<div style="color: #666; font-size: 0.8em; text-align: center; margin-top: 10px; font-family: monospace;">>_ Recuperando banco de dados. Criptografia ativa.</div>';
+
+            let lastReadId = pacote.lastReadId; // O número que veio do Banco de Dados
+            let unreadCount = 0;
+
+            pacote.messages.forEach(msg => {
+                desenharMensagem(msg.sender, msg.message);
+                
+                // Grava o maior ID que apareceu na tela
+                if (msg.id > maiorIdMensagemRecebido) maiorIdMensagemRecebido = msg.id;
+                
+                // Se o ID da mensagem for maior do que o que está salvo no banco, é nova!
+                if (msg.id > lastReadId) unreadCount++;
+            });
+
+            if (!isChatOpen) {
+                mensagensNaoLidas = unreadCount;
+                atualizarBadge();
+            } else {
+                marcarComoLido(); 
+            }
+
+        } else if (pacote.type === 'MESSAGE') {
+            desenharMensagem(pacote.sender, pacote.message);
+            
+            // Atualiza o maior ID com a nova mensagem
+            if (pacote.id > maiorIdMensagemRecebido) maiorIdMensagemRecebido = pacote.id;
+            
+            if (!isChatOpen) {
+                mensagensNaoLidas++;
+                atualizarBadge();
+            } else {
+                marcarComoLido(); 
+            }
+            
+        } else if (pacote.type === 'USERS') {
+            atualizarUsuariosOnline(pacote.list);
+        }
+    };
+
+    chatSocket.onclose = function () {
+        console.log(">> COM-LINK OFFLINE. A TENTAR RECONECTAR... <<");
+        const statusIcon = document.getElementById('chat-status-icon');
+        const statusText = document.getElementById('chat-status-text');
+        
+        if (statusIcon && statusText) {
+            statusIcon.style.color = '#ffaa00';
+            statusIcon.classList.add('blink');
+            statusText.innerHTML = '&nbsp;RECONECTANDO...';
+        }
+
+        if (inputChat && btnChat) {
+            inputChat.disabled = true;
+            btnChat.disabled = true;
+            inputChat.placeholder = "[ SINAL PERDIDO - AGUARDANDO RECONEXÃO ]";
+            inputChat.style.opacity = "0.5";
+            btnChat.style.opacity = "0.5";
+            btnChat.style.cursor = "not-allowed";
+        }
+
+        if (chatSocket && chatSocket.pingInterval) clearInterval(chatSocket.pingInterval);
+        chatSocket = null;
+        setTimeout(iniciarComLink, 5000);
+    };
 }

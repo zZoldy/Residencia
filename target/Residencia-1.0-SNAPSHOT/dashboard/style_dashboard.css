@@ -203,16 +203,6 @@ body {
 .hidden {
     display: none !important;
 }
-.blink {
-    animation: blink 1s infinite;
-    color: #00ff00;
-}
-
-@keyframes blink {
-    50% {
-        opacity: 0;
-    }
-}
 
 /* =========================================
    MÓDULO FINANCEIRO
@@ -795,8 +785,12 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     user-select: none;
-    border: 1px solid transparent;
-    padding: 5px 10px;
+    border: 1px solid #004400; /* Borda verde escura fixa */
+    padding: 8px 15px; /* Um pouco mais gordinho para facilitar o clique no celular */
+    border-radius: 4px; /* Cantos levemente arredondados */
+    background: rgba(0, 15, 0, 0.5); /* Fundo sutil */
+    font-weight: bold;
+    margin-left: auto;
 }
 .system-status:hover {
     border-color: #00ff00;
@@ -915,6 +909,46 @@ body {
     font-family: monospace;
     border-radius: 3px;
     box-shadow: 0 0 10px rgba(0,255,0,0.2);
+}
+
+/* =========================================
+   BADGE DE NOTIFICAÇÃO DO CHAT
+   ========================================= */
+.chat-badge {
+    background: #cc0000;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: bold;
+    font-family: monospace;
+    padding: 2px 7px;
+    border-radius: 12px;
+    margin-left: 10px;
+    box-shadow: 0 0 8px rgba(255, 0, 0, 0.8);
+    animation: pulse-badge 1.5s infinite;
+}
+
+.blink {
+    animation: blink 1s infinite;
+    color: #00ff00;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+@keyframes pulse-badge {
+    0% {
+        box-shadow: 0 0 5px rgba(255,0,0,0.5);
+    }
+    50% {
+        box-shadow: 0 0 15px rgba(255,0,0,1);
+        transform: scale(1.1);
+    }
+    100% {
+        box-shadow: 0 0 5px rgba(255,0,0,0.5);
+    }
 }
 
 @media (max-width: 768px) {

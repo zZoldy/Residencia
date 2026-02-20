@@ -49,6 +49,7 @@
 
                 <header class="dash-header">
                     <div style="display: flex; align-items: center; gap: 15px;">
+
                         <button class="btn-mobile-menu" onclick="toggleNav()" title="Abrir Menu">☰</button>
                         <div class="house-info">
                             <div class="host-line">
@@ -62,9 +63,12 @@
                                 <span class="copy-hint">[ COPIAR ]</span>
                             </div>
                         </div>
-                        <div class="system-status" onclick="toggleChat()" title="Abrir Terminal de Comunicações">
-                            <span class="blink">●</span>ONLINE
-                        </div>
+                    </div>
+                    <div class="system-status" onclick="toggleChat()" title="Abrir Terminal de Comunicações">
+                        <span id="chat-status-icon" class="blink" style="color:#00ff00;"> ● </span> 
+                        <span id="chat-status-text"> ONLINE </span>
+                        <span id="chat-badge" class="chat-badge" style="display: none;"> 0</span>
+                    </div>
                 </header>
 
                 <div id="module-home" class="widgets-grid">
@@ -159,8 +163,10 @@
                             </select>
 
                             <select id="filter-date" class="matrix-input-field filter-input" onchange="aplicarFiltros()">
-                                <option value="DESC">Data: Mais Recentes</option>
-                                <option value="ASC">Data: Mais Antigas</option>
+                                <option value="DESC">Registro: Mais Recentes</option>
+                                <option value="ASC">Registro: Mais Antigas</option>
+                                <option value="DUE_ASC" style="color:#ffaa00;">Vencimento: Mais Próximos</option>
+                                <option value="DUE_DESC" style="color:#ffaa00;">Vencimento: Mais Distantes</option>
                             </select>
                         </div>
                         <div class="table-responsive">
