@@ -932,6 +932,36 @@ body {
     color: #00ff00;
 }
 
+/* Garante que a janela não ultrapasse a altura da tela */
+#modal-transaction .matrix-window {
+    max-height: 90vh;      /* Ocupa no máximo 90% da altura da visão */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;      /* Impede que a borda brilhe "vaze" */
+}
+
+/* Área de rolagem interna */
+#modal-transaction .window-content {
+    flex: 1;               /* Faz o conteúdo ocupar o espaço restante */
+    overflow-y: auto;      /* Ativa o scroll apenas na vertical */
+    padding-right: 15px;   /* Evita que o scroll fique colado nos campos */
+}
+
+/* Estilização da Barra de Rolagem Matrix (Opcional, mas melhora o visual) */
+#modal-transaction .window-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+#modal-transaction .window-content::-webkit-scrollbar-track {
+    background: rgba(0, 20, 0, 0.5);
+}
+
+#modal-transaction .window-content::-webkit-scrollbar-thumb {
+    background: #00ff00;
+    border-radius: 10px;
+    box-shadow: 0 0 10px #00ff00;
+}
+
 @keyframes blink {
     50% {
         opacity: 0;

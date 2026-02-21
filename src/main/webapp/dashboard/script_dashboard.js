@@ -137,6 +137,14 @@ function abrirModalTransacao() {
     document.getElementById('trans-amount').disabled = false;
     document.getElementById('trans-shared').disabled = false;
 
+    itensNotaAtual = [];
+
+    document.getElementById('btn-revisar-itens').style.display = 'none';
+
+    const sefazArea = document.getElementById('sefaz-link-area');
+    if (sefazArea)
+        sefazArea.style.display = 'none';
+
     document.getElementById('modal-transaction').classList.remove('hidden');
     document.getElementById('trans-desc').focus();
 }
@@ -168,6 +176,10 @@ function abrirModalEdicao(transId) {
     const selectShared = document.getElementById('trans-shared');
     if (selectShared)
         selectShared.disabled = true;
+
+    const sefazArea = document.getElementById('sefaz-link-area');
+    if (sefazArea)
+        sefazArea.style.display = 'none';
 
     document.getElementById('modal-transaction').classList.remove('hidden');
 }
@@ -520,11 +532,12 @@ async function salvarTransacao(event) {
         user_id: user.id,
         description: document.getElementById('trans-desc').value,
         amount: parseFloat(document.getElementById('trans-amount').value),
-        nf_key: document.getElementById('trans-nf').value,
+        nf_key: document.getElementById('trans-nf').value.replace(/\s/g, ''),
         status: document.getElementById('trans-status').value,
         isShared: desejaDividir,
         due_date: document.getElementById('trans-due-date') ? document.getElementById('trans-due-date').value : null,
-        observation: document.getElementById('trans-obs') ? document.getElementById('trans-obs').value : ""
+        observation: document.getElementById('trans-obs') ? document.getElementById('trans-obs').value : "",
+        items: itensNotaAtual.length > 0 ? itensNotaAtual : null
     };
 
     try {
@@ -538,6 +551,8 @@ async function salvarTransacao(event) {
         if (data.success) {
             fecharModalTransacao();
             document.getElementById('form-transaction').reset();
+
+            itensNotaAtual = [];
 
             // Limpa o ID oculto para não travar o modal em "Modo Edição"
             if (idInput)
@@ -1036,14 +1051,15 @@ function toggleChat() {
     const sidebar = document.getElementById('chat-sidebar');
     if (sidebar) {
         sidebar.classList.toggle('open');
-        
+
         if (sidebar.classList.contains('open')) {
             document.getElementById('chat-input').focus();
-            
+
             marcarComoLido(); // Avisa o Banco de Dados que lemos tudo!
 
             const chatMessages = document.getElementById('chat-messages');
-            if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+            if (chatMessages)
+                chatMessages.scrollTop = chatMessages.scrollHeight;
 
             if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
                 iniciarComLink();
@@ -1080,11 +1096,12 @@ function desenharMensagem(remetente, msgCriptografada) {
 }
 
 function iniciarComLink() {
-    if (chatSocket || !user || !user.house_id) return;
+    if (chatSocket || !user || !user.house_id)
+        return;
 
     let basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/dashboard'));
     let wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    
+
     // MUDANÇA DE SEGURANÇA: Agora passamos user.id em vez do nome!
     let wsUrl = `${wsProtocol}//${window.location.host}${basePath}/api/chat/${user.house_id}/${user.id}`;
 
@@ -1097,7 +1114,7 @@ function iniciarComLink() {
         console.log(">> COM-LINK ESTABELECIDO <<");
         const statusIcon = document.getElementById('chat-status-icon');
         const statusText = document.getElementById('chat-status-text');
-        
+
         if (statusIcon && statusText) {
             statusIcon.style.color = '#00ff00';
             statusIcon.classList.add('blink');
@@ -1114,7 +1131,8 @@ function iniciarComLink() {
         }
 
         chatSocket.pingInterval = setInterval(() => {
-            if (chatSocket && chatSocket.readyState === WebSocket.OPEN) chatSocket.send("SYS_PING");
+            if (chatSocket && chatSocket.readyState === WebSocket.OPEN)
+                chatSocket.send("SYS_PING");
         }, 5000);
     };
 
@@ -1123,43 +1141,67 @@ function iniciarComLink() {
         const sidebar = document.getElementById('chat-sidebar');
         const isChatOpen = sidebar && sidebar.classList.contains('open');
 
+        // Pega o seu próprio nome (exatamente como o Java processa)
+        const meuNome = user.name.split(' ')[0];
+
         if (pacote.type === 'HISTORY') {
             const chatBox = document.getElementById('chat-messages');
             chatBox.innerHTML = '<div style="color: #666; font-size: 0.8em; text-align: center; margin-top: 10px; font-family: monospace;">>_ Recuperando banco de dados. Criptografia ativa.</div>';
 
-            let lastReadId = pacote.lastReadId; // O número que veio do Banco de Dados
+            let lastReadId = pacote.lastReadId;
             let unreadCount = 0;
+            let temMensagemMinhaNaoLida = false;
 
             pacote.messages.forEach(msg => {
                 desenharMensagem(msg.sender, msg.message);
-                
-                // Grava o maior ID que apareceu na tela
-                if (msg.id > maiorIdMensagemRecebido) maiorIdMensagemRecebido = msg.id;
-                
-                // Se o ID da mensagem for maior do que o que está salvo no banco, é nova!
-                if (msg.id > lastReadId) unreadCount++;
+
+                if (msg.id > maiorIdMensagemRecebido)
+                    maiorIdMensagemRecebido = msg.id;
+
+                // === FILTRO DE ESPELHO NO HISTÓRICO ===
+                const isMinhaMensagem = (msg.sender === meuNome);
+
+                if (msg.id > lastReadId) {
+                    if (!isMinhaMensagem) {
+                        unreadCount++; // Só soma se a mensagem for de OUTRA pessoa
+                    } else {
+                        temMensagemMinhaNaoLida = true; // Se eu mandei de outra tela, preciso atualizar o banco
+                    }
+                }
             });
 
             if (!isChatOpen) {
                 mensagensNaoLidas = unreadCount;
                 atualizarBadge();
+                // Se o histórico puxou uma mensagem minha que o banco achava que não estava lida, atualiza.
+                if (temMensagemMinhaNaoLida)
+                    marcarComoLido();
             } else {
-                marcarComoLido(); 
+                marcarComoLido();
             }
 
         } else if (pacote.type === 'MESSAGE') {
             desenharMensagem(pacote.sender, pacote.message);
-            
-            // Atualiza o maior ID com a nova mensagem
-            if (pacote.id > maiorIdMensagemRecebido) maiorIdMensagemRecebido = pacote.id;
-            
+
+            if (pacote.id > maiorIdMensagemRecebido)
+                maiorIdMensagemRecebido = pacote.id;
+
+            // === FILTRO DE ESPELHO EM TEMPO REAL ===
+            const isMinhaMensagem = (pacote.sender === meuNome);
+
             if (!isChatOpen) {
-                mensagensNaoLidas++;
-                atualizarBadge();
+                if (!isMinhaMensagem) {
+                    // Só apita e soma se for mensagem da Leni (ou outro morador)
+                    mensagensNaoLidas++;
+                    atualizarBadge();
+                } else {
+                    // Fui eu que mandei do outro navegador! Atualiza o banco silenciosamente
+                    marcarComoLido();
+                }
             } else {
-                marcarComoLido(); 
+                marcarComoLido();
             }
-            
+
         } else if (pacote.type === 'USERS') {
             atualizarUsuariosOnline(pacote.list);
         }
@@ -1169,7 +1211,7 @@ function iniciarComLink() {
         console.log(">> COM-LINK OFFLINE. A TENTAR RECONECTAR... <<");
         const statusIcon = document.getElementById('chat-status-icon');
         const statusText = document.getElementById('chat-status-text');
-        
+
         if (statusIcon && statusText) {
             statusIcon.style.color = '#ffaa00';
             statusIcon.classList.add('blink');
@@ -1185,8 +1227,242 @@ function iniciarComLink() {
             btnChat.style.cursor = "not-allowed";
         }
 
-        if (chatSocket && chatSocket.pingInterval) clearInterval(chatSocket.pingInterval);
+        if (chatSocket && chatSocket.pingInterval)
+            clearInterval(chatSocket.pingInterval);
         chatSocket = null;
         setTimeout(iniciarComLink, 5000);
     };
+}
+
+// NOTA FISCAL
+// Dicionário IBGE -> SEFAZ
+// ==========================================
+// MÓDULO NFC-e / DIVISOR DE CONTAS
+// ==========================================
+
+const SEFAZ_URLS = {
+    '11': 'http://www.nfce.sefin.ro.gov.br/', '12': 'http://www.sefaznet.ac.gov.br/nfce/consulta', '13': 'http://sistemas.sefaz.am.gov.br/nfceweb/formConsulta.do', '14': 'http://www.sefaz.rr.gov.br/nfce/consulta', '15': 'https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/nfceForm.seam', '16': 'https://www.sefaz.ap.gov.br/sate/seg/SEGf_AcessarFuncao.jsp?cdFuncao=FIS_1261', '17': 'http://www.sefaz.to.gov.br/nfce/consulta.jsf', '21': 'http://www.nfce.sefaz.ma.gov.br/portal/consultarNFCe.jsp', '22': 'http://webas.sefaz.pi.gov.br/nfceweb/consultarNFCe.jsf', '23': 'http://nfce.sefaz.ce.gov.br/pages/ShowNFCe.html', '24': 'http://nfce.set.rn.gov.br/consultarNFCe.aspx', '25': 'http://www.receita.pb.gov.br/ser/servicos-nfce/consultar-nfce', '26': 'http://nfce.sefaz.pe.gov.br/nfce-web/consultarNFCe', '27': 'http://nfce.sefaz.al.gov.br/consultaNFCe.htm', '28': 'http://www.nfce.se.gov.br/portal/consultarNFCe.jsp', '29': 'http://nfe.sefaz.ba.gov.br/servicos/nfce/modulos/geral/NFCEC_consulta_chave_acesso.aspx', '31': 'http://nfce.fazenda.mg.gov.br/portalnfce', '32': 'http://app.sefaz.es.gov.br/ConsultaNFCe/ws/consultarNFCe.asmx', '33': 'http://www4.fazenda.rj.gov.br/consultaDFe/paginas/consultaChaveAcesso.faces', '35': 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx', '41': 'http://www.fazenda.pr.gov.br/nfce/consulta', '42': 'https://sat.sef.sc.gov.br/tax.NET/sat.nfe.web/consulta_publica_nfce.aspx', '43': 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx', '50': 'http://www.dfe.ms.gov.br/nfce/consulta', '51': 'http://www.sefaz.mt.gov.br/nfce/consultanfce', '52': 'https://www.sefaz.go.gov.br/nfce/consulta', '53': 'http://dec.fazenda.df.gov.br/ConsultarNFCe.aspx'
+};
+
+let itensNotaAtual = [];
+
+function buscarSefaz() {
+    const inputChave = document.getElementById('trans-nf');
+    const chave = inputChave.value.replace(/\D/g, '');
+
+    if (chave.length !== 44) {
+        alert("A chave de acesso deve conter exatamente 44 números.");
+        return;
+    }
+
+    const ufCode = chave.substring(0, 2);
+    const urlSefaz = SEFAZ_URLS[ufCode];
+
+    if (urlSefaz) {
+        // Envia para a raiz do site, sem forçar parâmetros na URL
+        document.getElementById('btn-open-sefaz').href = urlSefaz;
+        document.getElementById('sefaz-link-area').style.display = 'block';
+
+        // Copia automaticamente a chave para facilitar o Ctrl+V
+        navigator.clipboard.writeText(chave).then(() => {
+            const btnBuscar = document.getElementById('btn-buscar-sefaz');
+            const textoOriginal = btnBuscar.innerText;
+            btnBuscar.innerText = "COPIADO! (CTRL+V NO SITE)";
+            btnBuscar.style.color = "#ffaa00";
+            btnBuscar.style.borderColor = "#ffaa00";
+
+            setTimeout(() => {
+                btnBuscar.innerText = textoOriginal;
+                btnBuscar.style.color = "#00ff00";
+                btnBuscar.style.borderColor = "#00ff00";
+            }, 3000);
+        }).catch(err => console.log('Erro ao copiar chave:', err));
+    } else {
+        alert("Estado (UF: " + ufCode + ") não suportado no momento.");
+    }
+}
+
+function abrirModalDivisor() {
+    document.getElementById('modal-divisor-nota').classList.remove('hidden');
+    renderizarItens();
+}
+
+function fecharModalDivisor() {
+    document.getElementById('modal-divisor-nota').classList.add('hidden');
+}
+
+function alternarDono(index) {
+    itensNotaAtual[index].owner = itensNotaAtual[index].owner === 'HOUSE' ? 'ME' : 'HOUSE';
+    renderizarItens();
+}
+
+function atualizarQuantidade(index, novaQtd) {
+    novaQtd = parseFloat(novaQtd);
+    if (isNaN(novaQtd) || novaQtd < 0)
+        return;
+    itensNotaAtual[index].quantity = novaQtd;
+    renderizarItens();
+}
+
+async function enviarArquivoNota() {
+    const fileInput = document.getElementById('nfe-file');
+    if (!fileInput.files.length)
+        return;
+
+    // Feedback visual forte de Loading da Inteligência Artificial
+    const btnUpload = document.getElementById('btn-upload-pdf');
+    const textoOriginal = btnUpload.innerText;
+
+    btnUpload.innerHTML = "⏳ PROCESSANDO IA... AGUARDE";
+    btnUpload.style.color = "#00ffff"; // Muda para azul ciano enquanto pensa
+    btnUpload.style.borderColor = "#00ffff";
+    btnUpload.disabled = true;
+    document.body.style.cursor = "wait"; // Muda o mouse para a ampulheta
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    try {
+        const response = await fetch('../api/leitor-nota', {method: 'POST', body: formData});
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            itensNotaAtual = data.items.map(item => {
+                return {
+                    ...item,
+                    owner: 'HOUSE',
+                    originalQty: item.quantity,
+                    unitPrice: item.price / item.quantity
+                };
+            });
+            abrirModalDivisor();
+            document.getElementById('btn-revisar-itens').style.display = 'block';
+        } else {
+            alert(data.message); // Agora o erro da IA aparece bonito aqui
+        }
+    } catch (error) {
+        alert("Falha crítica de comunicação com o servidor.");
+    } finally {
+        // Restaura o botão ao normal quando a IA termina
+        btnUpload.innerText = textoOriginal;
+        btnUpload.style.color = "#ffaa00";
+        btnUpload.style.borderColor = "#ffaa00";
+        btnUpload.disabled = false;
+        document.body.style.cursor = "default";
+        fileInput.value = "";
+    }
+}
+
+function renderizarItens() {
+    const listArea = document.getElementById('nfe-items-list');
+    listArea.innerHTML = '';
+    let totalCasa = 0, totalMeu = 0;
+
+    itensNotaAtual.forEach((item, index) => {
+        if (item.owner === 'HOUSE')
+            totalCasa += item.price;
+        else
+            totalMeu += item.price;
+
+        const div = document.createElement('div');
+        div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #222; transition: 0.3s; gap: 5px;";
+
+        const corDono = item.owner === 'HOUSE' ? '#00ff00' : '#ffaa00';
+        const bgBtn = item.owner === 'HOUSE' ? '#003300' : '#332200';
+        const txtBtn = item.owner === 'HOUSE' ? '🏠 CASA' : '👤 MEU';
+
+        // ATUALIZADO: Usando flex: 3 para o nome, dando muito mais espaço para ele não cortar
+        div.innerHTML = `
+            <div style="flex: 3; color: #ccc; font-size: 0.85em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-right: 5px;" title="${item.name}">${item.name}</div>
+            
+            <div style="flex: 1; text-align: center;">
+                <input type="number" step="0.01" value="${item.quantity}" onchange="atualizarQuantidade(${index}, this.value)" style="width: 100%; max-width: 60px; background: #000; color: #fff; border: 1px solid #444; text-align: center; border-radius: 3px; padding: 4px;">
+            </div>
+            
+            <div style="flex: 1.5; text-align: right; color: ${corDono}; font-weight: bold; font-size: 0.95em;">
+                R$ ${item.price.toFixed(2)}
+            </div>
+            
+            <div style="flex: 1.5; text-align: right;">
+                <button type="button" onclick="alternarDono(${index})" class="btn-matrix" style="padding: 5px; font-size: 0.7em; border-color: ${corDono}; color: ${corDono}; background: ${bgBtn}; width: 100%; max-width: 80px;">
+                    ${txtBtn}
+                </button>
+            </div>
+        `;
+        listArea.appendChild(div);
+    });
+
+    document.getElementById('total-casa').innerText = totalCasa.toFixed(2);
+    document.getElementById('total-meu').innerText = totalMeu.toFixed(2);
+}
+
+function salvarDivisao() {
+    const totalCasaStr = document.getElementById('total-casa').innerText;
+    const campoValor = document.getElementById('trans-amount');
+
+    if (campoValor) {
+        campoValor.value = totalCasaStr;
+        campoValor.style.backgroundColor = 'rgba(0, 255, 0, 0.2)';
+        setTimeout(() => campoValor.style.backgroundColor = '', 1000);
+    }
+
+// MOSTRA o botão de revisão para permitir alterações posteriores
+    if (itensNotaAtual.length > 0) {
+        document.getElementById('btn-revisar-itens').style.display = 'block';
+    }
+
+    fecharModalDivisor();
+}
+
+function formatarChaveSefaz(input) {
+    // 1. Remove tudo o que não for número (ignora espaços, letras, traços)
+    let numeros = input.value.replace(/\D/g, '');
+
+    // 2. Trava exatamente em 44 números
+    if (numeros.length > 44) {
+        numeros = numeros.substring(0, 44);
+    }
+
+    // 3. Devolve para o campo formatado com um espaço a cada 4 números
+    input.value = numeros.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+// ==========================================
+// ADIÇÃO MANUAL DE ITENS AO DIVISOR
+// ==========================================
+function adicionarItemManual() {
+    const nameInput = document.getElementById('manual-name');
+    const qtyInput = document.getElementById('manual-qty');
+    const priceInput = document.getElementById('manual-price');
+
+    const name = nameInput.value.trim().toUpperCase();
+    const qty = parseFloat(qtyInput.value);
+    const price = parseFloat(priceInput.value);
+
+    // Validação de segurança
+    if (!name || isNaN(qty) || isNaN(price) || qty <= 0 || price <= 0) {
+        alert("Preencha o nome, a quantidade e o valor total corretamente.");
+        return;
+    }
+
+    // Cria o objeto no mesmo padrão do Java/Gemini
+    const novoItem = {
+        id: 'manual_' + Date.now(), // Gera um ID único
+        name: name,
+        quantity: qty,
+        price: price,
+        owner: 'HOUSE', // Padrão: vai para a casa
+        originalQty: qty,
+        unitPrice: price / qty // Descobre o valor unitário para a matemática não quebrar
+    };
+
+    // Joga na lista e redesenha a tela
+    itensNotaAtual.push(novoItem);
+    renderizarItens();
+
+    // Limpa os campos para o próximo item
+    nameInput.value = '';
+    qtyInput.value = '';
+    priceInput.value = '';
+    nameInput.focus();
 }

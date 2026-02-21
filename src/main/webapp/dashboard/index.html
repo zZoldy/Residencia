@@ -49,7 +49,6 @@
 
                 <header class="dash-header">
                     <div style="display: flex; align-items: center; gap: 15px;">
-
                         <button class="btn-mobile-menu" onclick="toggleNav()" title="Abrir Menu">☰</button>
                         <div class="house-info">
                             <div class="host-line">
@@ -72,7 +71,6 @@
                 </header>
 
                 <div id="module-home" class="widgets-grid">
-
                     <div class="widget-card">
                         <div class="widget-header"><h3>Resumo Financeiro (Mês)</h3></div>
                         <div class="widget-body">
@@ -103,7 +101,6 @@
                     <div class="widget-card" style="grid-column: span 2;">
                         <div class="widget-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <h3>👥 Moradores & Contribuições</h3>
-
                             <select id="filter-members-time" class="matrix-input-field" style="width: auto; padding: 2px 10px; margin: 0; font-size: 0.8em;" onchange="renderizarMembrosCasa(this.value)">
                                 <option value="MONTH" selected>Este Mês</option>
                                 <option value="DAY">Hoje</option>
@@ -112,15 +109,12 @@
                             </select>
                         </div>
                         <div class="widget-body">
-                            <div id="home-members-list" class="members-grid">
-                            </div>
+                            <div id="home-members-list" class="members-grid"></div>
                         </div>
                     </div>
-
                 </div>
 
                 <div id="module-wallet" class="hidden module-container">
-
                     <div class="wallet-header">
                         <h2><span class="blink">█</span> SYS_FINANCE // REGISTRO DE DESPESAS</h2>
                         <p>>_ Controle de gastos e pendências da residência.</p>
@@ -183,8 +177,7 @@
                                         <th>Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody id="transaction-tbody">
-                                </tbody>
+                                <tbody id="transaction-tbody"></tbody>
                             </table>
                         </div>
                     </div>
@@ -230,7 +223,6 @@
 
                 <div id="module-tasks" class="hidden"><h2>Tarefas (Em breve)</h2></div>
 
-
             </main>
         </div>
 
@@ -242,6 +234,31 @@
                 <div class="window-content">
                     <form id="form-transaction" onsubmit="salvarTransacao(event)">
                         <input type="hidden" id="trans-id" value="">
+
+                        <div class="input-group" style="background: rgba(0, 255, 0, 0.05); padding: 15px; border: 1px dashed #00ff00; border-radius: 5px; margin-bottom: 15px;">
+                            <label style="color: #00ff00; display: flex; justify-content: space-between;">
+                                <span>Chave da Nota Fiscal (NFC-e)</span>
+                                <span style="font-size: 0.8em; color: #888;">*Opcional para extração</span>
+                            </label>
+
+                            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+                                <input type="text" id="trans-nf" class="matrix-input-field" placeholder="Ex: 5221 0900..." maxlength="60" style="width: 100%; font-size: 1.1em; letter-spacing: 1px;" oninput="formatarChaveSefaz(this)">
+                                <button type="button" id="btn-buscar-sefaz" onclick="buscarSefaz()" class="btn-matrix" style="padding: 10px; border-color: #00ff00; color: #00ff00; font-weight: bold; width: 100%;">🔍 BUSCAR ITENS NO PORTAL</button>
+                            </div>
+
+                            <div id="sefaz-link-area" style="display: none; padding-top: 15px; border-top: 1px dashed #333;">
+                                <p style="color: #aaa; font-size: 0.85em; margin-bottom: 10px; text-align: center;">
+                                    1. Cole a chave. 2. Resolva o CAPTCHA. 3. <strong>Ctrl+P</strong> e Salve como <strong>PDF</strong>.
+                                </p>
+                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <a id="btn-open-sefaz" href="#" target="_blank" class="btn-matrix" style="background: #003300; text-decoration: none; padding: 10px; font-size: 0.9em; color: #00ff00; text-align: center;">[ 1 ] ABRIR PORTAL SEFAZ</a>
+
+                                    <input type="file" id="nfe-file" accept=".html,.htm,.pdf" style="display: none;" onchange="enviarArquivoNota()">
+                                    <button type="button" id="btn-upload-pdf" onclick="document.getElementById('nfe-file').click()" class="btn-matrix" style="border-color: #ffaa00; color: #ffaa00; padding: 10px; font-size: 0.9em; font-weight: bold;">[ 2 ] 📁 ANEXAR PDF DA NOTA</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="input-group">
                             <label>Descrição (Ex: Mercado, Luz, Aluguel)</label>
                             <input type="text" id="trans-desc" class="matrix-input-field" required>
@@ -249,7 +266,13 @@
 
                         <div class="input-group">
                             <label>Valor (R$)</label>
-                            <input type="number" id="trans-amount" step="0.01" min="0.01" class="matrix-input-field" required>
+                            <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                <input type="number" id="trans-amount" step="0.01" min="0.01" class="matrix-input-field" required style="flex: 1;">
+
+                                <button type="button" id="btn-revisar-itens" onclick="abrirModalDivisor()" class="btn-matrix" style="display: none; padding: 10px; border-color: #00ffff; color: #00ffff; font-size: 0.8em; white-space: nowrap;">
+                                    [ REVISAR ITENS ]
+                                </button>
+                            </div>
                         </div>
 
                         <div class="input-group">
@@ -270,11 +293,6 @@
                             <input type="text" id="trans-obs" class="matrix-input-field" placeholder="Ex: Referente ao mês de Janeiro...">
                         </div>
 
-                        <div class="input-group">
-                            <label>Chave da Nota Fiscal (Opcional - Apenas números)</label>
-                            <input type="text" id="trans-nf" class="matrix-input-field" placeholder="Ex: 35210900...">
-                        </div>
-
                         <div class="input-group" id="div-trans-status">
                             <label>Status da Despesa</label>
                             <select id="trans-status" class="matrix-input-field">
@@ -292,9 +310,48 @@
             </div>
         </div>
 
+        <div id="modal-divisor-nota" class="matrix-overlay hidden" style="z-index: 9999;">
+            <div class="matrix-window" style="width: 95%; max-width: 700px; border-color: #00ff00; display: flex; flex-direction: column;">
+                <div class="window-header" style="border-bottom: 1px solid #333;">
+                    <span class="blink" style="color:#00ff00;">█</span> <span style="color:#00ff00; font-weight:bold;">DIVISOR DE ITENS DA NF</span>
+                </div>
+
+                <div class="window-content" style="padding: 15px; display: flex; flex-direction: column; gap: 15px;">
+
+                    <div style="background: rgba(0, 255, 0, 0.05); padding: 10px; border-radius: 5px; border: 1px dashed #004400; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="manual-name" class="matrix-input-field" placeholder="Nome do Produto" style="flex: 3; min-width: 150px; padding: 8px;">
+                        <input type="number" id="manual-qty" class="matrix-input-field" placeholder="Qtd" step="0.01" style="flex: 1; min-width: 60px; padding: 8px; text-align: center;">
+                        <input type="number" id="manual-price" class="matrix-input-field" placeholder="Total (R$)" step="0.01" style="flex: 1; min-width: 80px; padding: 8px; text-align: center;">
+                        <button type="button" onclick="adicionarItemManual()" class="btn-matrix" style="padding: 8px 15px; border-color: #00ff00; color: #00ff00; font-weight: bold;">[ + ]</button>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; color: #888; font-size: 0.8em; padding: 0 10px; border-bottom: 1px solid #333; padding-bottom: 5px;">
+                        <span style="flex: 3;">PRODUTO</span>
+                        <span style="flex: 1; text-align: center;">QTD</span>
+                        <span style="flex: 1.5; text-align: right;">TOTAL R$</span>
+                        <span style="flex: 1.5; text-align: right;">DONO</span>
+                    </div>
+
+                    <div id="nfe-items-list" style="max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                    </div>
+
+                    <div style="border-top: 1px dashed #333; padding-top: 15px; display: flex; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 1.2em; font-weight: bold; background: #050505; padding: 15px; border-radius: 5px; border: 1px solid #222;">
+                            <span style="color: #00ff00;">TOTAL CASA: <br>R$ <span id="total-casa">0.00</span></span>
+                            <span style="color: #ffaa00; text-align: right;">MEU TOTAL: <br>R$ <span id="total-meu">0.00</span></span>
+                        </div>
+
+                        <div class="modal-actions" style="justify-content: flex-end; display: flex; gap: 10px;">
+                            <button onclick="fecharModalDivisor()" class="btn-matrix btn-cancel" style="color: #ff0000; border-color: #ff0000; flex: 1; max-width: 200px;">[ CANCELAR ]</button>
+                            <button onclick="salvarDivisao()" class="btn-matrix" style="color: #00ff00; border-color: #00ff00; font-weight: bold; flex: 2; max-width: 300px;">[ SALVAR DESPESA ]</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="modal-danger" class="matrix-overlay hidden">
             <div class="matrix-window danger-theme">
-
                 <div class="window-header" style="border-bottom-color: #ff0000; display: flex; justify-content: space-between;">
                     <div>
                         <span class="blink" style="color:#ff0000;">█</span> 
@@ -318,7 +375,6 @@
                             [ INICIAR SEQUÊNCIA ]
                         </button>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -363,7 +419,7 @@
 
             <div class="chat-input-area">
                 <input type="text" id="chat-input" class="matrix-input-field" placeholder="Transmitir mensagem..." onkeypress="if (event.key === 'Enter')
-                            enviarMensagemChat()">
+                                enviarMensagemChat()">
                 <button class="btn-matrix" onclick="enviarMensagemChat()">[ > ]</button>
             </div>
         </div>

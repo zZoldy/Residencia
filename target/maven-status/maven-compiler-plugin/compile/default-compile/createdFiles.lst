@@ -2,6 +2,7 @@ com\app\residencia\resources\JakartaEE8Resource.class
 com\app\residencia\HouseServlet$HouseRequest.class
 com\app\residencia\ProfileServlet.class
 com\app\residencia\WalletServlet$UserCota.class
+com\app\residencia\InvoiceParserServlet.class
 com\app\residencia\WalletServlet.class
 com\app\residencia\RegisterServlet.class
 com\app\residencia\ChatWebSocket.class
