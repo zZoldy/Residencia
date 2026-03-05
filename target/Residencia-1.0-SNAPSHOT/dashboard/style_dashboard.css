@@ -1,3 +1,22 @@
+/* ==========================================================================
+ * MATRIX OS - DASHBOARD STYLESHEET
+ * ==========================================================================
+ * Descrição: Arquivo principal de estilização da interface do Dashboard.
+ * Arquitetura: CSS Vanilla estruturado em blocos modulares.
+ * Tema Visual: Dark/Cyberpunk (Matrix Inspired).
+ * * Esquema de Cores Semântico:
+ * - #00ff00 (Verde Neon)  : Sucesso, Status Ativo, Ações Positivas, Fundo da Casa.
+ * - #ff3333 (Vermelho)    : Alertas, Atrasos, Zona de Risco (Danger Zone).
+ * - #00ffff (Ciano)       : Itens Pessoais, Identidade do Operador Logado.
+ * - #ffaa00 (Laranja)     : Pendências, Itens de Terceiros.
+ * - #050505 (Preto/Cinza) : Background principal, simulando terminal de linha de comando.
+ * * Principais Técnicas Utilizadas:
+ * - Variáveis Visuais (Glow Effects) com `box-shadow` e `text-shadow`.
+ * - Layout Reativo com CSS Grid (`widgets-grid`) e Flexbox.
+ * - Viewport Dinâmico (`100dvh`) para compatibilidade com navegadores mobile.
+ * - Micro-interações via `@keyframes` (blink, pulse).
+ * ========================================================================== */
+
 body {
     margin: 0;
     padding: 0;
@@ -384,6 +403,11 @@ body {
 .box-glow-red {
     border-color: #aa0000;
     box-shadow: 0 0 15px rgba(255, 0, 0, 0.1);
+}
+
+.box-glow-cyan { 
+    border-color: #00ffff; 
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.1); 
 }
 
 .value-green {
@@ -930,6 +954,22 @@ body {
 .blink {
     animation: blink 1s infinite;
     color: #00ff00;
+}
+
+/* Cor Ciano para valores e textos de itens pessoais */
+.value-cyan {
+    color: #00ffff !important;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+}
+
+/* Efeito sutil na linha que for gasto pessoal */
+.row-personal {
+    background: rgba(0, 255, 255, 0.02) !important;
+}
+
+.row-personal:hover {
+    background: rgba(0, 255, 255, 0.05) !important;
 }
 
 /* Garante que a janela não ultrapasse a altura da tela */

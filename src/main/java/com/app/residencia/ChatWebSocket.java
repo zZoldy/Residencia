@@ -21,7 +21,6 @@ import javax.websocket.Session;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
 
-// MUDANÇA DE SEGURANÇA: Agora usamos o userId na URL, e não mais o nome!
 @ServerEndpoint("/api/chat/{houseId}/{userId}")
 public class ChatWebSocket {
 
@@ -31,14 +30,12 @@ public class ChatWebSocket {
     @OnOpen
     public void onOpen(Session session, @PathParam("houseId") String houseId, @PathParam("userId") String userId) {
         
-        // 1. Descobre o nome verdadeiro do usuário pelo ID
         String userName = buscarNomeUsuario(userId);
         if (userName == null || !enviarHistorico(session, houseId, userId)) {
             cortarConexao(session);
             return;
         }
 
-        // 2. Regista a sessão usando o nome real
         houseSessions.computeIfAbsent(houseId, k -> new ConcurrentHashMap<>()).put(session, userName);
         System.out.println("[SYS] Operador Online: " + userName + " | Casa: " + houseId);
 
@@ -48,8 +45,6 @@ public class ChatWebSocket {
     @OnMessage
     public void onMessage(String payload, Session session, @PathParam("houseId") String houseId, @PathParam("userId") String userId) {
 
-        // === COMANDO DE LEITURA (MARK_READ) ===
-        // O JavaScript avisa o Java: "Eu já li até a mensagem X"
         if (payload.startsWith("MARK_READ:")) {
             int lastReadId = Integer.parseInt(payload.split(":")[1]);
             atualizarUltimaLida(userId, lastReadId);
@@ -64,7 +59,6 @@ public class ChatWebSocket {
             return; 
         }
 
-        // === MENSAGEM NORMAL DO CHAT ===
         String userName = houseSessions.get(houseId).get(session);
         int msgId = salvarMensagemNoBanco(houseId, userName, payload);
         
@@ -75,7 +69,7 @@ public class ChatWebSocket {
 
         JsonObject json = new JsonObject();
         json.addProperty("type", "MESSAGE");
-        json.addProperty("id", msgId); // Agora a mensagem tem um ID único
+        json.addProperty("id", msgId);
         json.addProperty("sender", userName);
         json.addProperty("message", payload);
 
@@ -91,14 +85,9 @@ public class ChatWebSocket {
         }
     }
 
-    // ==========================================
-    // FUNÇÕES DE BANCO DE DADOS (BLINDADAS)
-    // ==========================================
-
     private boolean enviarHistorico(Session session, String houseId, String userId) {
         try (Connection conn = DatabaseManager.getConnection()) {
             
-            // 1. Descobre onde o usuário parou de ler
             int lastReadId = 0;
             String sqlUser = "SELECT last_read_msg_id FROM users WHERE id = ?";
             PreparedStatement stmtUser = conn.prepareStatement(sqlUser);
@@ -108,7 +97,6 @@ public class ChatWebSocket {
                 lastReadId = rsUser.getInt("last_read_msg_id");
             }
 
-            // 2. Puxa as últimas 50 mensagens incluindo o ID
             String sqlChat = "SELECT id, sender_name, message FROM chat_messages WHERE house_id = ? ORDER BY id DESC LIMIT 50";
             PreparedStatement stmtChat = conn.prepareStatement(sqlChat);
             stmtChat.setInt(1, Integer.parseInt(houseId));
@@ -129,7 +117,6 @@ public class ChatWebSocket {
                 historyArray.add(o);
             }
 
-            // 3. Monta o pacote final com o histórico e a marcação de leitura
             JsonObject json = new JsonObject();
             json.addProperty("type", "HISTORY");
             json.addProperty("lastReadId", lastReadId);
@@ -147,7 +134,6 @@ public class ChatWebSocket {
     private int salvarMensagemNoBanco(String houseId, String userName, String encryptedMessage) {
         try (Connection conn = DatabaseManager.getConnection()) {
             String sql = "INSERT INTO chat_messages (house_id, sender_name, message) VALUES (?, ?, ?)";
-            // Statement.RETURN_GENERATED_KEYS avisa o MySQL para devolver o ID gerado
             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             stmt.setInt(1, Integer.parseInt(houseId));
             stmt.setString(2, userName);
@@ -156,7 +142,7 @@ public class ChatWebSocket {
             
             ResultSet rs = stmt.getGeneratedKeys();
             if (rs.next()) {
-                return rs.getInt(1); // Retorna o ID novinho em folha
+                return rs.getInt(1); 
             }
             return -1;
         } catch (Exception e) {
@@ -183,13 +169,11 @@ public class ChatWebSocket {
             stmt.setInt(1, Integer.parseInt(userId));
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
-                return rs.getString("name").split(" ")[0]; // Pega o primeiro nome
+                return rs.getString("name");
             }
         } catch (Exception e) {}
         return null;
     }
-
-    // ... (As funções broadcastOnlineUsers, broadcastToHouse, cortarConexao e verificarBancoAtivo continuam iguaizinhas, omitidas para economizar espaço) ...
     
     private void broadcastOnlineUsers(String houseId) {
         Map<Session, String> sessions = houseSessions.get(houseId);

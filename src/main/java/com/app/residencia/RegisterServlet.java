@@ -27,7 +27,6 @@ public class RegisterServlet extends HttpServlet {
         Gson gson = new Gson();
 
         try {
-            // 1. LER O PACOTE COMPLETO (USER + HOUSE)
             StringBuilder sb = new StringBuilder();
             String s;
             while ((s = request.getReader().readLine()) != null) {
@@ -35,7 +34,7 @@ public class RegisterServlet extends HttpServlet {
             }
             FullRegistrationData data = gson.fromJson(sb.toString(), FullRegistrationData.class);
 
-            // 2. VALIDAÇÕES BÁSICAS (Sem tocar no banco ainda)
+            // VALIDAÇÕES BÁSICAS (Sem tocar no banco ainda)
             if (!DatabaseManager.isValid(data.email, "EMAIL")
                     || !DatabaseManager.isValid(data.password, "SENHA")
                     || !DatabaseManager.isValid(data.name, "TEXTO")) {
@@ -44,11 +43,10 @@ public class RegisterServlet extends HttpServlet {
                 return;
             }
 
-            // 3. ABRE A CONEXÃO E A TRANSAÇÃO
+            //  ABRE A CONEXÃO E A TRANSAÇÃO
             try (Connection conn = DatabaseManager.getConnection()) {
 
-                // --- INÍCIO DA TRANSAÇÃO (O Pulo do Gato) ---
-                conn.setAutoCommit(false); // Desliga o salvamento automático
+                conn.setAutoCommit(false);
 
                 try {
                     // A. Verifica se email já existe
@@ -64,12 +62,12 @@ public class RegisterServlet extends HttpServlet {
                         if (rsEmail.getBoolean("active")) {
                             throw new Exception("Email já cadastrado na Matrix.");
                         } else {
-                            // Encontramos o fantasma! Salvamos o ID dele para ressuscitá-lo.
+                            // Fantasma! Salvamos o ID dele para ressuscitá-lo.
                             ghostId = rsEmail.getInt("id");
                         }
                     }
 
-                    // B. Lógica da Casa (Descobrir o ID da casa ANTES ou DEPOIS de criar o usuário)
+                    // Lógica da Casa (Descobrir o ID da casa ANTES ou DEPOIS de criar o usuário)
                     Integer houseId = null;
                     String finalHouseName = "";
                     String finalRole = "MEMBER";
@@ -109,11 +107,10 @@ public class RegisterServlet extends HttpServlet {
                     }
 
                     if (houseId == null) {
-                        // Se chegou aqui e não tem houseId, é porque falhou ao criar ou entrar na casa.
+  
                         throw new Exception("Falha crítica: Nenhuma residência foi associada ao usuário.");
                     }
 
-                    // C. Inserir o Usuário (Já com o house_id correto!)
                     if (houseId == null) {
                         throw new Exception("Falha crítica: Nenhuma residência foi associada.");
                     }
@@ -126,12 +123,12 @@ public class RegisterServlet extends HttpServlet {
                         PreparedStatement stmtRevive = conn.prepareStatement(sqlRevive);
                         stmtRevive.setString(1, data.name);
                         stmtRevive.setString(2, data.email);
-                        stmtRevive.setString(3, data.password); // Atualiza com a NOVA SENHA
+                        stmtRevive.setString(3, data.password); 
                         stmtRevive.setInt(4, houseId);
                         stmtRevive.setString(5, finalRole);
                         stmtRevive.setInt(6, ghostId);
                         stmtRevive.executeUpdate();
-                        newUserId = ghostId; // Mantém o ID antigo
+                        newUserId = ghostId; 
                     } else {
                         // === CRIAR NOVO USUÁRIO NORMAL ===
                         String sqlUser = "INSERT INTO users (name, email, password_hash, house_id, role) VALUES (?, ?, ?, ?, ?)";
@@ -171,9 +168,9 @@ public class RegisterServlet extends HttpServlet {
                     out.print(gson.toJson(json));
 
                 } catch (Exception ex) {
-                    // --- DEU ERRO? DESFAZ TUDO! ---
+                    // --- DESFAZ TUDO! ---
                     conn.rollback();
-                    throw ex; // Repassa o erro para o catch de fora
+                    throw ex; 
                 }
 
             }
@@ -184,13 +181,12 @@ public class RegisterServlet extends HttpServlet {
         }
     }
 
-    // Classe auxiliar para receber TUDO de uma vez
     private class FullRegistrationData {
 
         String name;
         String email;
         String password;
         String houseAction; // "CREATE" ou "JOIN"
-        String houseData;   // Nome da casa OU Código
+        String houseData;
     }
 }

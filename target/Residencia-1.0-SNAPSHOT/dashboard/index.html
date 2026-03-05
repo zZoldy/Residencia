@@ -122,12 +122,18 @@
 
                     <div class="wallet-summary">
                         <div class="summary-card box-glow-green">
-                            <h3>Gasto Mensal (Pagos)</h3>
+                            <h3>Gasto Mensal (Casa)</h3>
                             <h1 id="wallet-balance" class="value-green">R$ 0,00</h1>
                         </div>
+
                         <div class="summary-card box-glow-red">
                             <h3>Contas Pendentes</h3>
                             <h1 id="wallet-pending" class="value-red">R$ 0,00</h1>
+                        </div>
+
+                        <div class="summary-card box-glow-cyan">
+                            <h3>Meus Gastos (Mês)</h3>
+                            <h1 id="wallet-my-spending" style="color: #00ffff;">R$ 0,00</h1>
                         </div>
                     </div>
 
@@ -234,6 +240,7 @@
                 <div class="window-content">
                     <form id="form-transaction" onsubmit="salvarTransacao(event)">
                         <input type="hidden" id="trans-id" value="">
+                        <input type="hidden" id="itens_nota_json_input" name="itens_nota_json">
 
                         <div class="input-group" style="background: rgba(0, 255, 0, 0.05); padding: 15px; border: 1px dashed #00ff00; border-radius: 5px; margin-bottom: 15px;">
                             <label style="color: #00ff00; display: flex; justify-content: space-between;">
@@ -255,6 +262,9 @@
 
                                     <input type="file" id="nfe-file" accept=".html,.htm,.pdf" style="display: none;" onchange="enviarArquivoNota()">
                                     <button type="button" id="btn-upload-pdf" onclick="document.getElementById('nfe-file').click()" class="btn-matrix" style="border-color: #ffaa00; color: #ffaa00; padding: 10px; font-size: 0.9em; font-weight: bold;">[ 2 ] 📁 ANEXAR PDF DA NOTA</button>
+                                    <button type="button" id="btn-revisar-edit" onclick="abrirModalDivisor()" class="btn-matrix" style="display: none; border-color: #00ffff; color: #00ffff; padding: 10px; font-size: 0.9em; width: 100%; margin-top: 10px;">
+                                        [ 🔍 VER ITENS DA NOTA ]
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -419,7 +429,7 @@
 
             <div class="chat-input-area">
                 <input type="text" id="chat-input" class="matrix-input-field" placeholder="Transmitir mensagem..." onkeypress="if (event.key === 'Enter')
-                                enviarMensagemChat()">
+                            enviarMensagemChat()">
                 <button class="btn-matrix" onclick="enviarMensagemChat()">[ > ]</button>
             </div>
         </div>

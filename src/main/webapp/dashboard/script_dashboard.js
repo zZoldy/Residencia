@@ -6,29 +6,37 @@
 const userToken = localStorage.getItem('user_token'); // Mantive o nome padrão que estávamos usando
 
 if (!userToken) {
-    // Se não tem token, expulsa para o login
+    // Redireciona usuários não autenticados para o Login
     alert("Acesso Negado. Identifique-se.");
     window.location.href = "../index.html";
 }
 
-let user = JSON.parse(userToken);
+/**
+ * Variáveis de Estado Global
+ */
 
-let todasTransacoes = []; // Guarda todos os dados originalmente vindos do banco
-let todosMembros = [];
-let lastDataHash = "";
-let syncInterval;
+let user = JSON.parse(userToken); // Dados do operador logado
+let todasTransacoes = []; // Armazena cache local de transações do banco
+let todosMembros = []; // Armazena a lista de moradores ativos
+let lastDataHash = ""; // Hash de telemetria para evitar re-renderizações desnecessárias
+let syncInterval; // Motor de pooling para atualizações em tempo real
 
-// 2. INICIALIZAÇÃO
+// --- 2. INICIALIZAÇÃO DA MATRIX ---
 document.addEventListener("DOMContentLoaded", () => {
     carregarDadosUsuario();
 
+    // Responsividade: Recolhe o menu automaticamente em telas pequenas
     if (window.innerWidth <= 768) {
         document.querySelector('.sidebar').classList.add('collapsed');
     }
 
-    iniciarComLink();
+    iniciarComLink(); // Ativa o terminal de comunicação (WebSocket)
 });
 
+/**
+ * Preenche a interface com os dados do usuário, verifica permissões (Role)
+ * e inicia o motor de sincronização em tempo real.
+ */
 function carregarDadosUsuario() {
     // Preenche Sidebar
     const userNameEl = document.getElementById('dash-user-name');
@@ -36,13 +44,13 @@ function carregarDadosUsuario() {
     const userRoleEl = document.getElementById('dash-user-role');
 
     if (userNameEl)
-        userNameEl.innerText = user.name.split(' ')[0];
+        userNameEl.innerText = user.name;
     if (userInitialEl)
         userInitialEl.innerText = user.name.charAt(0).toUpperCase();
     if (userRoleEl)
         userRoleEl.innerText = user.role === 'ADMIN' ? 'Operador Master' : 'Membro';
 
-    // Preenche Header
+    // Preenche Header(Privacidade e Permissões)
     const houseNameEl = document.getElementById('dash-house-name');
     const inviteCodeEl = document.getElementById('dash-invite-code');
     const inviteBoxEl = document.querySelector('.invite-box');
@@ -52,31 +60,31 @@ function carregarDadosUsuario() {
 
     if (inviteCodeEl && inviteBoxEl) {
         if (user.role === 'ADMIN' && user.invite_code) {
-            // É Admin: Mostra o código e libera a caixa
             inviteCodeEl.innerText = user.invite_code;
             inviteBoxEl.classList.remove('restricted');
         } else {
-            // É Membro: Escreve Restrito e bloqueia a caixa
             inviteCodeEl.innerText = "Restrito";
             inviteBoxEl.classList.add('restricted');
         }
     }
 
-    // Carrega tudo na primeira vez
+    // Primeira carga de dados financeiros
     carregarTransacoes();
 
-    // ==========================================
-    // O MOTOR DO TEMPO REAL (FALTAVA ISSO!)
-    // ==========================================
+    // SMART SYNC: Bipa o servidor silenciosamente a cada 5 segundos
     if (syncInterval)
         clearInterval(syncInterval);
 
     syncInterval = setInterval(() => {
-        carregarTransacoes(true); // "true" significa busca silenciosa (não trava a tela)
-    }, 5000); // Bipa o servidor a cada 5 segundos
+        carregarTransacoes(true); // O 'true' desativa alertas de tela
+    }, 5000);
 }
 
-// 3. NAVEGAÇÃO
+/**
+ * Gerencia a navegação estilo SPA (Single Page Application).
+ * Alterna a visibilidade das 'sections' do dashboard.
+ * @param {string} moduleName - O nome do módulo alvo (HOME, WALLET, PROFILE, TASKS).
+ */
 function loadModule(moduleName) {
     document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
 
@@ -97,13 +105,15 @@ function loadModule(moduleName) {
         document.getElementById('module-tasks').classList.remove('hidden');
     }
 
-    // Se estiver num ecrã de telemóvel, fecha o menu automaticamente após clicar
+    // Auto-collapse no mobilear
     if (window.innerWidth <= 768) {
         document.querySelector('.sidebar').classList.add('collapsed');
     }
 }
 
-// 4. LOGOUT
+/**
+ * Destrói a sessão local e retorna à tela de login.
+ */
 function logoutSistema() {
     if (confirm("Desconectar da Matrix?")) {
         localStorage.removeItem('matrix_user');
@@ -111,9 +121,11 @@ function logoutSistema() {
     }
 }
 
-// 5. UTILITÁRIOS
+/**
+ * Função utilitária atrelada ao evento 'Copy to Clipboard'.
+ * Exclusiva para perfis ADMIN.
+ */
 function copiarCodigo() {
-    // 1. Trava de Segurança: Se não for ADMIN, a função aborta aqui mesmo.
     if (user.role !== 'ADMIN')
         return;
 
@@ -139,7 +151,23 @@ function abrirModalTransacao() {
 
     itensNotaAtual = [];
 
+    const btnAcao = document.getElementById('btn-buscar-sefaz');
+    btnAcao.innerHTML = "🔍 BUSCAR ITENS NO PORTAL";
+    btnAcao.style.color = "#00ff00";
+    btnAcao.style.borderColor = "#00ff00";
+    btnAcao.onclick = () => buscarSefaz(); // Volta a ser função de buscar
+
     document.getElementById('btn-revisar-itens').style.display = 'none';
+
+    // Esconde o botão que fica embaixo do anexo (exclusivo do Editar)
+    const btnRevisarEdit = document.getElementById('btn-revisar-edit');
+    if (btnRevisarEdit)
+        btnRevisarEdit.style.display = 'none';
+
+    // Limpa o input oculto para não enviar itens de uma nota anterior sem querer
+    const hiddenItens = document.getElementById('itens_nota_json_input');
+    if (hiddenItens)
+        hiddenItens.value = "";
 
     const sefazArea = document.getElementById('sefaz-link-area');
     if (sefazArea)
@@ -149,33 +177,53 @@ function abrirModalTransacao() {
     document.getElementById('trans-desc').focus();
 }
 
-// Abre para EDITAR EXISTENTE
 function abrirModalEdicao(transId) {
-    // Busca os dados da conta salva na memória do JS
     const t = todasTransacoes.find(x => x.id === transId);
     if (!t)
         return;
 
     document.getElementById('form-transaction').reset();
-    document.getElementById('trans-id').value = t.id; // Salva o ID no campo oculto
+    document.getElementById('trans-id').value = t.id;
     document.getElementById('trans-modal-title').innerText = "EDITAR REGISTRO";
 
-    // Preenche os campos
     document.getElementById('trans-desc').value = t.description;
     document.getElementById('trans-amount').value = t.amount;
     document.getElementById('trans-nf').value = t.nf_key || "";
     document.getElementById('trans-obs').value = t.observation || "";
     document.getElementById('trans-status').value = t.status;
 
-    // Se tiver data, preenche
     if (t.due_date)
         document.getElementById('trans-due-date').value = t.due_date;
 
-    // Bloqueia Valor e Rateio (Para não quebrar a matemática da casa)
     document.getElementById('trans-amount').disabled = true;
     const selectShared = document.getElementById('trans-shared');
     if (selectShared)
         selectShared.disabled = true;
+
+    // --- LÓGICA DINÂMICA DO BOTÃO DE NOTA ---
+    const btnAcao = document.getElementById('btn-buscar-sefaz');
+
+    if (t.nf_key && t.nf_key.length > 10) {
+        btnAcao.innerHTML = "📝 REVISAR ITENS DA NOTA";
+        btnAcao.style.color = "#00ffff";
+        btnAcao.style.borderColor = "#00ffff";
+
+        btnAcao.onclick = () => {
+            itensNotaAtual = t.items || [];
+            abrirModalDivisor(true);
+        };
+
+        document.getElementById('btn-revisar-itens').style.display = 'none'; // Esconde o do valor
+        const btnRevisarEdit = document.getElementById('btn-revisar-edit');
+        if (btnRevisarEdit)
+            btnRevisarEdit.style.display = 'block';
+    } else {
+        btnAcao.innerHTML = "🔍 BUSCAR ITENS NO PORTAL";
+        btnAcao.style.color = "#00ff00";
+        btnAcao.style.borderColor = "#00ff00";
+        btnAcao.onclick = () => buscarSefaz();
+        document.getElementById('btn-revisar-itens').style.display = 'none';
+    }
 
     const sefazArea = document.getElementById('sefaz-link-area');
     if (sefazArea)
@@ -201,27 +249,43 @@ async function carregarTransacoes(isSilent = false) {
         return;
 
     try {
-        const response = await fetch(`../api/wallet?houseId=${user.house_id}`);
+        const response = await fetch(`../api/wallet?houseId=${user.house_id}&userId=${user.id}`);
         const data = await response.json();
 
         if (data.success) {
             // === SMART SYNC ===
             const currentDataHash = JSON.stringify(data);
             if (currentDataHash === lastDataHash) {
-                return; // Nada mudou. Aborta para não piscar a tela!
+                return;
             }
             lastDataHash = currentDataHash;
-            // ==================
 
             todasTransacoes = data.transactions || [];
             todosMembros = data.members || [];
 
-            // 1. Atualiza WIDGET DA HOME
+            // ATUALIZA OS WIDGETS DE RESUMO
+            const elGastoCasa = document.getElementById('wallet-balance');
+            const elGastoMeu = document.getElementById('wallet-my-spending'); // O card azul
+            const elPendente = document.getElementById('wallet-pending');
+
+            // Valor Total da Casa (Soma de tudo que não é [PESSOAL])
+            if (elGastoCasa)
+                elGastoCasa.innerText = formatarMoeda(data.gasto_mensal);
+
+            // VALOR INDIVIDUAL (Soma de [PESSOAL] + Sua cota no rateio)
+            if (elGastoMeu)
+                elGastoMeu.innerText = formatarMoeda(data.meus_gastos);
+
+            // Valor Pendente da Casa
+            if (elPendente)
+                elPendente.innerText = formatarMoeda(data.pending);
+
             const homeGasto = document.getElementById('home-gasto-mensal');
             const homeStatus = document.getElementById('home-status');
 
             if (homeGasto)
                 homeGasto.innerText = formatarMoeda(data.gasto_mensal);
+
             if (homeStatus) {
                 if (data.pending > 0) {
                     homeStatus.innerHTML = `<span style="color:#ffaa00;">⚠️ Pendente na casa: ${formatarMoeda(data.pending)}</span>`;
@@ -230,7 +294,6 @@ async function carregarTransacoes(isSilent = false) {
                 }
             }
 
-            // 3. Atualiza UI
             aplicarFiltros();
             atualizarWidgetContas();
 
@@ -248,14 +311,12 @@ async function carregarTransacoes(isSilent = false) {
 }
 
 // Lógica que lê os filtros e processa a lista
-// Lógica que lê os filtros e processa a lista
 function aplicarFiltros() {
     const searchEl = document.getElementById('filter-search');
     const operatorEl = document.getElementById('filter-operator');
     const statusEl = document.getElementById('filter-status');
     const dateSortEl = document.getElementById('filter-date');
 
-    // Se os filtros não existirem na tela, aborta pra não dar erro
     if (!searchEl || !operatorEl || !statusEl || !dateSortEl)
         return;
 
@@ -266,17 +327,14 @@ function aplicarFiltros() {
 
     let filtradas = [...todasTransacoes];
 
-    // 1. Filtro de Operador
     if (operator === 'ME') {
         filtradas = filtradas.filter(t => t.user_id === user.id);
     }
 
-    // 2. Filtro de Status (COM LÓGICA DE ATRASADAS)
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
     if (status === 'OVERDUE') {
-        // Pega só as Pendentes e compara a data igual fazemos na tabela
         filtradas = filtradas.filter(t => {
             if (t.status !== 'PENDING' || !t.due_date)
                 return false;
@@ -284,11 +342,9 @@ function aplicarFiltros() {
             const parts = t.due_date.split('-');
             const vData = new Date(parts[0], parts[1] - 1, parts[2]);
 
-            // Retorna TRUE se a data de vencimento for menor que hoje
             return vData < hoje;
         });
     } else if (status !== 'ALL') {
-        // Se for Pago, Cancelado ou Pendente Normal
         filtradas = filtradas.filter(t => t.status === status);
     }
 
@@ -341,35 +397,56 @@ function aplicarFiltros() {
     // ==========================================
     let totalPagoFiltrado = 0;
     let totalPendenteFiltrado = 0;
+    let totalMeuFiltrado = 0;
 
     const hjMes = hoje.getMonth() + 1;
     const hjAno = hoje.getFullYear();
     const temFiltroAtivo = (operator !== 'ALL' || status !== 'ALL' || search.trim() !== '');
 
     filtradas.forEach(t => {
+        const isPessoal = t.description.toUpperCase().includes("[PESSOAL]");
+
         if (t.status === 'PAID') {
-            if (temFiltroAtivo) {
-                totalPagoFiltrado += t.amount;
-            } else {
-                const [tDia, tMes, tAno] = t.date.split('/').map(Number);
-                if (tMes === hjMes && tAno === hjAno) {
+
+            if (!isPessoal) {
+                if (temFiltroAtivo) {
                     totalPagoFiltrado += t.amount;
+                } else {
+                    const [tDia, tMes, tAno] = t.date.split('/').map(Number);
+                    if (tMes === hjMes && tAno === hjAno) {
+                        totalPagoFiltrado += t.amount;
+                    }
                 }
             }
+
+            if (t.user_id === user.id) {
+                totalMeuFiltrado += t.amount;
+            }
+
         } else if (t.status === 'PENDING') {
-            totalPendenteFiltrado += t.amount;
+            if (!isPessoal) {
+                totalPendenteFiltrado += t.amount;
+            }
         }
     });
 
-    // Atualiza o visual no HTML
     const walletBalance = document.getElementById('wallet-balance');
     const walletPending = document.getElementById('wallet-pending');
+    const walletMySpending = document.getElementById('wallet-my-spending');
 
     if (walletBalance) {
         walletBalance.innerText = formatarMoeda(totalPagoFiltrado);
         const tituloPago = walletBalance.previousElementSibling;
         if (tituloPago) {
-            tituloPago.innerText = temFiltroAtivo ? "Total Pago (Filtrado)" : "Gasto Mensal (Pagos)";
+            tituloPago.innerText = temFiltroAtivo ? "Total Casa (Filtrado)" : "Gasto da Casa (Mês)";
+        }
+    }
+
+    if (walletMySpending) {
+        walletMySpending.innerText = formatarMoeda(totalMeuFiltrado);
+        const tituloMeu = walletMySpending.previousElementSibling;
+        if (tituloMeu) {
+            tituloMeu.innerText = temFiltroAtivo ? "Meus Gastos (Filtrado)" : "Meus Gastos Individuais";
         }
     }
 
@@ -385,7 +462,6 @@ function aplicarFiltros() {
         }
     }
 
-    // Manda a lista processada para desenhar a tabela
     renderizarTabela(filtradas);
 }
 
@@ -406,9 +482,13 @@ function renderizarTabela(listaTransacoes) {
         let statusHtml = "";
         let classCor = "";
 
+        // --- DETECÇÃO DE ITEM PESSOAL ---
+        const isPessoal = t.description.toUpperCase().includes("[PESSOAL]");
+        const corDestaque = isPessoal ? "#00ffff" : "";
+
         if (t.status === 'PAID') {
-            statusHtml = `<span style="color:#00ff00; font-weight:bold;">[ PAGO ]</span>`;
-            classCor = "value-green";
+            statusHtml = `<span style="color:${isPessoal ? '#00ffff' : '#00ff00'}; font-weight:bold;">[ PAGO ]</span>`;
+            classCor = isPessoal ? "value-cyan" : "value-green";
         } else if (t.status === 'PENDING') {
             statusHtml = `<span style="color:#ffaa00; font-weight:bold;">[ PENDENTE ]</span>`;
             classCor = "value-red";
@@ -421,12 +501,10 @@ function renderizarTabela(listaTransacoes) {
 
         let vencimentoHtml = '<span style="color:#333;">-</span>';
         if (t.due_date) {
-            const dataLimpa = t.due_date.split(' ')[0];
             const parts = t.due_date.split('-');
             const vData = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             const hoje = new Date();
             hoje.setHours(0, 0, 0, 0);
-
             const dataFormatada = `${parts[2]}/${parts[1]}/${parts[0]}`;
 
             if (t.status === 'PENDING') {
@@ -443,19 +521,14 @@ function renderizarTabela(listaTransacoes) {
         }
 
         let acoesHtml = '<span style="color:#333;">-</span>';
-
-        // Verifica se a conta pertence ao Operador Logado
         if (t.user_id === user.id) {
             let botoesExtras = "";
-            // Só mostra "Pagar" e "Cancelar" se a conta estiver Pendente
             if (t.status === 'PENDING') {
                 botoesExtras = `
                     <button class="btn-action-table btn-pay" onclick="mudarStatusConta(${t.id}, 'PAY')">Pagar</button>
                     <button class="btn-action-table btn-cancel-table" onclick="mudarStatusConta(${t.id}, 'CANCEL')">Cancelar</button>
                 `;
             }
-
-            // O botão "Editar" aparece sempre, mesmo se já estiver paga (para anexar NF, por exemplo)
             acoesHtml = `
                 <div class="action-buttons-container">
                     <button class="btn-action-table btn-edit" onclick="abrirModalEdicao(${t.id})">Editar</button>
@@ -463,41 +536,30 @@ function renderizarTabela(listaTransacoes) {
                 </div>
             `;
         } else if (t.status === 'PENDING' && t.user_active === false) {
-            // === NOVO: A conta é de um FANTASMA e está PENDENTE ===
-            // Libera o botão "Quitar Dívida" na cor Ciano Neon
             acoesHtml = `
                 <div class="action-buttons-container">
-                    <button class="btn-action-table btn-pay" style="color: #00ffff; border-color: #00ffff;" title="Assumir e pagar dívida de morador inativo" onclick="mudarStatusConta(${t.id}, 'PAY')">
-                        Quitar Dívida
-                    </button>
+                    <button class="btn-action-table btn-pay" style="color: #00ffff; border-color: #00ffff;" onclick="mudarStatusConta(${t.id}, 'PAY')">Quitar Dívida</button>
                 </div>
             `;
-
         } else {
             acoesHtml = `<span style="color:#555; font-size: 0.85em; font-weight: bold;">🔒 RESTRITO</span>`;
         }
 
-        let estiloLinha = "";
-        if (t.status === 'CANCELED') {
-            estiloLinha = 'style="color: #555; text-decoration: line-through;"';
-            nfFormatada = t.nf_key ? `<span class="nf-key-cell" style="text-decoration: line-through;">${t.nf_key}</span>` : '<span style="color:#333;">-</span>';
-            classCor = "";
-        }
+        let estiloLinha = t.status === 'CANCELED' ? 'style="color: #555; text-decoration: line-through;"' : '';
+        let estiloDescricao = isPessoal ? `style="color: #00ffff; font-weight: 500;"` : '';
 
-        let obsHtml = "";
-        if (t.observation && t.observation.trim() !== "") {
-            obsHtml = `<br><span style="color: #666; font-size: 0.8em;">> ${t.observation}</span>`;
-        }
+        let obsHtml = (t.observation && t.observation.trim() !== "") ? `<br><span style="color: #666; font-size: 0.8em;">> ${t.observation}</span>` : "";
 
-        let nomeOperador = t.user_active ?
-                t.user_name :
-                `<span style="color:#555; text-decoration:line-through;" title="Usuário Desintegrado">${t.user_name}</span> 👽`;
+        let nomeOperador = t.user_active ? t.user_name : `<span style="color:#555; text-decoration:line-through;">${t.user_name}</span> 👽`;
 
         const tr = document.createElement('tr');
+        if (isPessoal)
+            tr.classList.add('row-personal');
+
         tr.innerHTML = `
             <td ${estiloLinha}>${t.date}</td>
             <td ${estiloLinha}>${nomeOperador}</td> 
-            <td ${estiloLinha}>
+            <td ${estiloLinha} ${estiloDescricao}>
                 ${t.description} 
                 ${obsHtml} 
             </td>
@@ -517,7 +579,6 @@ async function salvarTransacao(event) {
     btn.innerText = "[ ENVIANDO... ]";
     btn.disabled = true;
 
-    // === O PULO DO GATO: VERIFICA SE É CRIAÇÃO OU EDIÇÃO ===
     const idInput = document.getElementById('trans-id');
     const transId = idInput && idInput.value ? parseInt(idInput.value) : 0;
     const acaoAtual = transId > 0 ? 'EDIT' : 'CREATE';
@@ -526,8 +587,8 @@ async function salvarTransacao(event) {
     const desejaDividir = desejaDividirEl ? (desejaDividirEl.value === 'true') : false;
 
     const payload = {
-        action: acaoAtual, // <-- AGORA ELE AVISA O JAVA SE É EDIT
-        transaction_id: transId, // <-- AGORA ELE MANDA O ID DA CONTA
+        action: acaoAtual,
+        transaction_id: transId,
         house_id: user.house_id,
         user_id: user.id,
         description: document.getElementById('trans-desc').value,
@@ -554,14 +615,11 @@ async function salvarTransacao(event) {
 
             itensNotaAtual = [];
 
-            // Limpa o ID oculto para não travar o modal em "Modo Edição"
             if (idInput)
                 idInput.value = "";
 
-            // Recarrega na hora para a conta aparecer instantaneamente na sua tela!
             carregarTransacoes(true);
 
-            // Avisos dinâmicos
             if (acaoAtual === 'CREATE' && desejaDividir) {
                 alert("A conta foi fatiada automaticamente para todos os moradores vivos!");
             }
@@ -641,7 +699,6 @@ async function salvarPerfil(event) {
         if (data.success) {
             alert("Dados salvos com sucesso!");
 
-            // Atualiza a memória local (LocalStorage) com o novo nome
             user.name = payload.name;
             localStorage.setItem('matrix_user', JSON.stringify(user));
 
@@ -658,7 +715,6 @@ async function salvarPerfil(event) {
 }
 
 async function excluirConta() {
-    // Dupla confirmação de segurança!
     if (!confirm("ATENÇÃO: Você está prestes a deletar sua conta permanentemente.\nTem certeza absoluta?"))
         return;
     if (!confirm("Último aviso. Suas contas cadastradas também serão apagadas. Deseja prosseguir?"))
@@ -681,8 +737,8 @@ async function excluirConta() {
 
         if (data.success) {
             alert("Desconectado da Matrix. Adeus.");
-            localStorage.removeItem('matrix_user'); // Apaga a memória local
-            window.location.href = "../index.html"; // Joga pra fora do sistema
+            localStorage.removeItem('matrix_user');
+            window.location.href = "../index.html";
         } else {
             alert("Erro: " + data.message);
         }
@@ -773,7 +829,20 @@ function atualizarWidgetContas() {
     if (!listaHtml)
         return;
 
-    let contasPendentes = todasTransacoes.filter(t => t.status === 'PENDING' && t.due_date);
+    // FILTRO DE PRIVACIDADE:
+    let contasPendentes = todasTransacoes.filter(t => {
+        const isPessoal = t.description.toUpperCase().includes("[PESSOAL]");
+        const ehMinha = t.user_id === user.id;
+
+        if (t.status !== 'PENDING' || !t.due_date)
+            return false;
+
+        // Se for pessoal e não for minha, esconde do widget
+        if (isPessoal && !ehMinha)
+            return false;
+
+        return true;
+    });
 
     if (contasPendentes.length === 0) {
         listaHtml.innerHTML = `
@@ -793,10 +862,7 @@ function atualizarWidgetContas() {
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
 
-        let classeItem = "upcoming";
-        let classeBadge = "badge-green";
-        let classeValor = "green";
-        let textoAlerta = `${parts[2]}/${parts[1]}`;
+        let classeItem = "upcoming", classeBadge = "badge-green", classeValor = "green", textoAlerta = `${parts[2]}/${parts[1]}`;
 
         if (vData < hoje) {
             classeItem = "overdue";
@@ -812,7 +878,6 @@ function atualizarWidgetContas() {
 
         const li = document.createElement('li');
         li.className = `bill-item ${classeItem}`;
-
         li.innerHTML = `
             <span class="bill-badge ${classeBadge}">[ ${textoAlerta} ]</span> 
             <span class="bill-title">${t.description}</span> 
@@ -822,7 +887,6 @@ function atualizarWidgetContas() {
     });
 }
 
-// 6. TOGGLE MENU (ABRIR/FECHAR SIDEBAR)
 function toggleNav() {
     const sidebar = document.querySelector('.sidebar');
     const iconArrow = document.getElementById('divider-icon-arrow');
@@ -830,11 +894,10 @@ function toggleNav() {
     if (sidebar) {
         sidebar.classList.toggle('collapsed');
 
-        // Inverte a direção da setinha
         if (sidebar.classList.contains('collapsed')) {
-            iconArrow.innerText = "▶"; // Menu fechado, seta pra fora
+            iconArrow.innerText = "▶";
         } else {
-            iconArrow.innerText = "◀"; // Menu aberto, seta pra dentro
+            iconArrow.innerText = "◀";
         }
     }
 }
@@ -944,7 +1007,7 @@ function fecharConfirmacao() {
     transacaoAlvoAcao = null;
 }
 
-// Essa função precisa ser chamada pelo ONCLICK do botão no HTML
+// Chamada pelo ONCLICK do botão no HTML
 async function confirmarAcaoTransacao() {
     if (!transacaoAlvoId || !transacaoAlvoAcao)
         return;
@@ -970,7 +1033,7 @@ async function confirmarAcaoTransacao() {
 
         if (data.success) {
             fecharConfirmacao();
-            carregarTransacoes(true); // Atualiza imediato a tela
+            carregarTransacoes(true);
         } else {
             alert("Erro: " + data.message);
             fecharConfirmacao();
@@ -1004,14 +1067,14 @@ function decriptarMatrix(hash) {
 // === DESENHA A LISTA DE QUEM ESTÁ ONLINE ===
 function atualizarUsuariosOnline(listaUsuarios) {
     const ul = document.getElementById('online-users-list');
-    ul.innerHTML = ""; // Limpa a lista velha
+    ul.innerHTML = "";
 
     listaUsuarios.forEach(nome => {
         const li = document.createElement('li');
         li.style.marginBottom = "5px";
 
         // Destaca você de verde, os outros ficam em Ciano Matrix
-        if (nome === user.name.split(' ')[0]) {
+        if (nome === user.name) {
             li.style.color = "#00ff00";
             li.innerHTML = `● ${nome} (Você)`;
         } else {
@@ -1022,9 +1085,9 @@ function atualizarUsuariosOnline(listaUsuarios) {
     });
 }
 
-// === CONTROLE DE LEITURA (NÍVEL 2) ===
+// === CONTROLE DE LEITURA ===
 let mensagensNaoLidas = 0;
-let maiorIdMensagemRecebido = 0; // Guarda o ID da última mensagem que chegou na tela
+let maiorIdMensagemRecebido = 0;
 
 function atualizarBadge() {
     const badge = document.getElementById('chat-badge');
@@ -1039,7 +1102,6 @@ function atualizarBadge() {
 }
 
 function marcarComoLido() {
-    // Só envia o aviso para o Java se tivermos mensagens e o socket estiver aberto
     if (maiorIdMensagemRecebido > 0 && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
         chatSocket.send("MARK_READ:" + maiorIdMensagemRecebido);
     }
@@ -1055,7 +1117,7 @@ function toggleChat() {
         if (sidebar.classList.contains('open')) {
             document.getElementById('chat-input').focus();
 
-            marcarComoLido(); // Avisa o Banco de Dados que lemos tudo!
+            marcarComoLido();
 
             const chatMessages = document.getElementById('chat-messages');
             if (chatMessages)
@@ -1075,7 +1137,7 @@ function enviarMensagemChat() {
     if (!msgOriginal || !chatSocket || chatSocket.readyState !== WebSocket.OPEN)
         return;
 
-    chatSocket.send(encriptarMatrix(msgOriginal)); // Manda o Hash pro Java
+    chatSocket.send(encriptarMatrix(msgOriginal));
     input.value = "";
 }
 
@@ -1084,7 +1146,7 @@ function desenharMensagem(remetente, msgCriptografada) {
     const msgLimpa = decriptarMatrix(msgCriptografada);
     const msgDiv = document.createElement('div');
 
-    if (remetente === user.name.split(' ')[0]) {
+    if (remetente === user) {
         msgDiv.className = 'chat-msg me';
     } else {
         msgDiv.className = 'chat-msg';
@@ -1102,7 +1164,6 @@ function iniciarComLink() {
     let basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/dashboard'));
     let wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
-    // MUDANÇA DE SEGURANÇA: Agora passamos user.id em vez do nome!
     let wsUrl = `${wsProtocol}//${window.location.host}${basePath}/api/chat/${user.house_id}/${user.id}`;
 
     chatSocket = new WebSocket(wsUrl);
@@ -1141,8 +1202,7 @@ function iniciarComLink() {
         const sidebar = document.getElementById('chat-sidebar');
         const isChatOpen = sidebar && sidebar.classList.contains('open');
 
-        // Pega o seu próprio nome (exatamente como o Java processa)
-        const meuNome = user.name.split(' ')[0];
+        const meuNome = user;
 
         if (pacote.type === 'HISTORY') {
             const chatBox = document.getElementById('chat-messages');
@@ -1163,9 +1223,9 @@ function iniciarComLink() {
 
                 if (msg.id > lastReadId) {
                     if (!isMinhaMensagem) {
-                        unreadCount++; // Só soma se a mensagem for de OUTRA pessoa
+                        unreadCount++;
                     } else {
-                        temMensagemMinhaNaoLida = true; // Se eu mandei de outra tela, preciso atualizar o banco
+                        temMensagemMinhaNaoLida = true;
                     }
                 }
             });
@@ -1173,7 +1233,6 @@ function iniciarComLink() {
             if (!isChatOpen) {
                 mensagensNaoLidas = unreadCount;
                 atualizarBadge();
-                // Se o histórico puxou uma mensagem minha que o banco achava que não estava lida, atualiza.
                 if (temMensagemMinhaNaoLida)
                     marcarComoLido();
             } else {
@@ -1191,11 +1250,9 @@ function iniciarComLink() {
 
             if (!isChatOpen) {
                 if (!isMinhaMensagem) {
-                    // Só apita e soma se for mensagem da Leni (ou outro morador)
                     mensagensNaoLidas++;
                     atualizarBadge();
                 } else {
-                    // Fui eu que mandei do outro navegador! Atualiza o banco silenciosamente
                     marcarComoLido();
                 }
             } else {
@@ -1233,12 +1290,6 @@ function iniciarComLink() {
         setTimeout(iniciarComLink, 5000);
     };
 }
-
-// NOTA FISCAL
-// Dicionário IBGE -> SEFAZ
-// ==========================================
-// MÓDULO NFC-e / DIVISOR DE CONTAS
-// ==========================================
 
 const SEFAZ_URLS = {
     '11': 'http://www.nfce.sefin.ro.gov.br/', '12': 'http://www.sefaznet.ac.gov.br/nfce/consulta', '13': 'http://sistemas.sefaz.am.gov.br/nfceweb/formConsulta.do', '14': 'http://www.sefaz.rr.gov.br/nfce/consulta', '15': 'https://appnfc.sefa.pa.gov.br/portal/view/consultas/nfce/nfceForm.seam', '16': 'https://www.sefaz.ap.gov.br/sate/seg/SEGf_AcessarFuncao.jsp?cdFuncao=FIS_1261', '17': 'http://www.sefaz.to.gov.br/nfce/consulta.jsf', '21': 'http://www.nfce.sefaz.ma.gov.br/portal/consultarNFCe.jsp', '22': 'http://webas.sefaz.pi.gov.br/nfceweb/consultarNFCe.jsf', '23': 'http://nfce.sefaz.ce.gov.br/pages/ShowNFCe.html', '24': 'http://nfce.set.rn.gov.br/consultarNFCe.aspx', '25': 'http://www.receita.pb.gov.br/ser/servicos-nfce/consultar-nfce', '26': 'http://nfce.sefaz.pe.gov.br/nfce-web/consultarNFCe', '27': 'http://nfce.sefaz.al.gov.br/consultaNFCe.htm', '28': 'http://www.nfce.se.gov.br/portal/consultarNFCe.jsp', '29': 'http://nfe.sefaz.ba.gov.br/servicos/nfce/modulos/geral/NFCEC_consulta_chave_acesso.aspx', '31': 'http://nfce.fazenda.mg.gov.br/portalnfce', '32': 'http://app.sefaz.es.gov.br/ConsultaNFCe/ws/consultarNFCe.asmx', '33': 'http://www4.fazenda.rj.gov.br/consultaDFe/paginas/consultaChaveAcesso.faces', '35': 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx', '41': 'http://www.fazenda.pr.gov.br/nfce/consulta', '42': 'https://sat.sef.sc.gov.br/tax.NET/sat.nfe.web/consulta_publica_nfce.aspx', '43': 'https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx', '50': 'http://www.dfe.ms.gov.br/nfce/consulta', '51': 'http://www.sefaz.mt.gov.br/nfce/consultanfce', '52': 'https://www.sefaz.go.gov.br/nfce/consulta', '53': 'http://dec.fazenda.df.gov.br/ConsultarNFCe.aspx'
@@ -1282,9 +1333,9 @@ function buscarSefaz() {
     }
 }
 
-function abrirModalDivisor() {
+function abrirModalDivisor(isReadOnly = false) {
     document.getElementById('modal-divisor-nota').classList.remove('hidden');
-    renderizarItens();
+    renderizarItens(isReadOnly);
 }
 
 function fecharModalDivisor() {
@@ -1314,7 +1365,7 @@ async function enviarArquivoNota() {
     const textoOriginal = btnUpload.innerText;
 
     btnUpload.innerHTML = "⏳ PROCESSANDO IA... AGUARDE";
-    btnUpload.style.color = "#00ffff"; // Muda para azul ciano enquanto pensa
+    btnUpload.style.color = "#00ffff"; 
     btnUpload.style.borderColor = "#00ffff";
     btnUpload.disabled = true;
     document.body.style.cursor = "wait"; // Muda o mouse para a ampulheta
@@ -1335,10 +1386,14 @@ async function enviarArquivoNota() {
                     unitPrice: item.price / item.quantity
                 };
             });
+            const hiddenItens = document.getElementById('itens_nota_json_input');
+            if (hiddenItens)
+                hiddenItens.value = JSON.stringify(itensNotaAtual);
+
             abrirModalDivisor();
             document.getElementById('btn-revisar-itens').style.display = 'block';
         } else {
-            alert(data.message); // Agora o erro da IA aparece bonito aqui
+            alert(data.message);
         }
     } catch (error) {
         alert("Falha crítica de comunicação com o servidor.");
@@ -1353,47 +1408,144 @@ async function enviarArquivoNota() {
     }
 }
 
-function renderizarItens() {
+// O parâmetro isReadOnly define se estamos CRIANDO (false) ou REVISANDO (true)
+function renderizarItens(isReadOnly = false) {
     const listArea = document.getElementById('nfe-items-list');
+    if (!listArea)
+        return;
     listArea.innerHTML = '';
-    let totalCasa = 0, totalMeu = 0;
 
+    // RESOLUÇÃO DE IDENTIDADE 
+    const transIdInput = document.getElementById('trans-id');
+    const transId = transIdInput ? transIdInput.value : "";
+
+    // Procuramos a transação original para saber quem a criou
+    const transacaoOriginal = todasTransacoes.find(t => t.id == transId);
+
+    // Se não houver transação, o dono é o usuário logado (Só é possível visualizar a conta se for o dono). 
+    // Se houver, pegamos o ID e Nome do criador original.
+    const idDonoDaConta = transacaoOriginal ? transacaoOriginal.user_id : user.id;
+    const nomeDonoDaConta = transacaoOriginal ? transacaoOriginal.user_name : user.name;
+    const souEuODono = (idDonoDaConta === user.id);
+
+    let totalCasa = 0;
+    let totalMeu = 0;
+    let totalOutros = 0;
+
+    // PREPARAÇÃO DO SELECT (SÓ SE NÃO FOR SOMENTE LEITURA)
+    let optionsHtml = '';
+    if (!isReadOnly) {
+        optionsHtml = `<option value="HOUSE">🏠 CASA</option>
+                       <option value="ME">🙋‍♂️ MEU</option>`;
+
+        if (typeof todosMembros !== 'undefined') {
+            todosMembros.forEach(m => {
+                if (m.id !== user.id && m.active) {
+                    optionsHtml += `<option value="USER_${m.id}">👤 ${m.name.split(' ')[0]}</option>`;
+                }
+            });
+        }
+    }
+
+    // PROCESSAMENTO DOS ITENS
     itensNotaAtual.forEach((item, index) => {
-        if (item.owner === 'HOUSE')
-            totalCasa += item.price;
-        else
-            totalMeu += item.price;
+        const precoNum = parseFloat(item.price) || 0;
+
+        let corDono = '#00ff00'; 
+        let nomeDonoVisual = '🏠 CASA';
+
+        // 'USER' ou 'ME' referem-se ao criador da conta (idDonoDaConta)
+        const pertenceAoCriador = (item.owner === 'ME' || item.owner === 'USER');
+
+        if (item.owner === 'HOUSE') {
+            totalCasa += precoNum;
+        } else if (pertenceAoCriador) {
+            totalMeu += precoNum;
+            if (souEuODono) {
+                corDono = '#ffaa00'; 
+                nomeDonoVisual = '🙋‍♂️ MEU';
+            } else {
+                corDono = '#00aaff'; 
+                nomeDonoVisual = `👤 ${nomeDonoDaConta.split(' ')[0]}`;
+            }
+        } else if (item.owner && item.owner.startsWith('USER_')) {
+            totalOutros += precoNum;
+            corDono = '#00aaff';
+
+            const uId = parseInt(item.owner.replace('USER_', ''));
+            const membro = todosMembros.find(m => m.id === uId);
+            nomeDonoVisual = membro ? `👤 ${membro.name.split(' ')[0]}` : '👤 Morador';
+        }
 
         const div = document.createElement('div');
         div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #222; transition: 0.3s; gap: 5px;";
 
-        const corDono = item.owner === 'HOUSE' ? '#00ff00' : '#ffaa00';
-        const bgBtn = item.owner === 'HOUSE' ? '#003300' : '#332200';
-        const txtBtn = item.owner === 'HOUSE' ? '🏠 CASA' : '👤 MEU';
+        let controlesHtml = '';
+        if (isReadOnly) {
+            controlesHtml = `
+                <div style="flex: 1; text-align: center; color: #888;">${item.quantity}x</div>
+                <div style="flex: 1.5; text-align: right; color: ${corDono}; font-weight: bold; font-size: 0.95em;">R$ ${precoNum.toFixed(2)}</div>
+                <div style="flex: 1.5; text-align: right; color: ${corDono}; font-size: 0.75em; font-weight: bold;">${nomeDonoVisual}</div>
+            `;
+        } else {
+            let selectPronto = optionsHtml.replace(`value="${item.owner}"`, `value="${item.owner}" selected`);
+            controlesHtml = `
+                <div style="flex: 1; text-align: center;">
+                    <input type="number" step="0.01" value="${item.quantity}" onchange="atualizarQuantidade(${index}, this.value)" style="width: 100%; max-width: 60px; background: #000; color: #fff; border: 1px solid #444; text-align: center; border-radius: 3px; padding: 4px;">
+                </div>
+                <div style="flex: 1.5; text-align: right; color: ${corDono}; font-weight: bold; font-size: 0.95em;">R$ ${precoNum.toFixed(2)}</div>
+                <div style="flex: 1.5; text-align: right;">
+                    <select onchange="alterarDonoSelect(${index}, this.value)" style="width: 100%; max-width: 95px; background: #111; color: ${corDono}; border: 1px solid ${corDono}; border-radius: 3px; padding: 4px; font-size: 0.75em; outline: none; cursor: pointer;">
+                        ${selectPronto}
+                    </select>
+                </div>
+            `;
+        }
 
-        // ATUALIZADO: Usando flex: 3 para o nome, dando muito mais espaço para ele não cortar
         div.innerHTML = `
             <div style="flex: 3; color: #ccc; font-size: 0.85em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-right: 5px;" title="${item.name}">${item.name}</div>
-            
-            <div style="flex: 1; text-align: center;">
-                <input type="number" step="0.01" value="${item.quantity}" onchange="atualizarQuantidade(${index}, this.value)" style="width: 100%; max-width: 60px; background: #000; color: #fff; border: 1px solid #444; text-align: center; border-radius: 3px; padding: 4px;">
-            </div>
-            
-            <div style="flex: 1.5; text-align: right; color: ${corDono}; font-weight: bold; font-size: 0.95em;">
-                R$ ${item.price.toFixed(2)}
-            </div>
-            
-            <div style="flex: 1.5; text-align: right;">
-                <button type="button" onclick="alternarDono(${index})" class="btn-matrix" style="padding: 5px; font-size: 0.7em; border-color: ${corDono}; color: ${corDono}; background: ${bgBtn}; width: 100%; max-width: 80px;">
-                    ${txtBtn}
-                </button>
-            </div>
+            ${controlesHtml}
         `;
         listArea.appendChild(div);
     });
 
-    document.getElementById('total-casa').innerText = totalCasa.toFixed(2);
-    document.getElementById('total-meu').innerText = totalMeu.toFixed(2);
+    // LÓGICA DE EXIBIÇÃO DE TOTAIS (PESSOAL vs COTA)
+    const descValue = document.getElementById('trans-desc').value.toUpperCase();
+    const isPessoal = descValue.includes("[PESSOAL]");
+
+    const elTotalCasa = document.getElementById('total-casa');
+    const elTotalMeu = document.getElementById('total-meu');
+
+    // Containers para esconder/mostrar
+    const contCasa = elTotalCasa ? elTotalCasa.parentElement : null;
+    const contMeu = elTotalMeu ? elTotalMeu.parentElement : null;
+
+    if (isPessoal) {
+        // Se for PESSOAL: Mostra apenas o total do dono 
+        if (contCasa)
+            contCasa.style.display = 'none';
+        if (contMeu)
+            contMeu.style.display = 'block';
+        if (elTotalMeu)
+            elTotalMeu.innerText = (totalCasa + totalMeu + totalOutros).toFixed(2);
+    } else {
+        // Se for COTA: Mostra apenas o balde da CASA
+        if (contCasa)
+            contCasa.style.display = 'block';
+        if (contMeu)
+            contMeu.style.display = 'none';
+        if (elTotalCasa)
+            elTotalCasa.innerText = totalCasa.toFixed(2);
+    }
+
+    if (document.getElementById('total-geral')) {
+        document.getElementById('total-geral').innerText = (totalCasa + totalMeu + totalOutros).toFixed(2);
+}
+}
+
+function alterarDonoSelect(index, novoDono) {
+    itensNotaAtual[index].owner = novoDono;
+    renderizarItens(false);
 }
 
 function salvarDivisao() {
@@ -1406,7 +1558,6 @@ function salvarDivisao() {
         setTimeout(() => campoValor.style.backgroundColor = '', 1000);
     }
 
-// MOSTRA o botão de revisão para permitir alterações posteriores
     if (itensNotaAtual.length > 0) {
         document.getElementById('btn-revisar-itens').style.display = 'block';
     }
@@ -1415,15 +1566,12 @@ function salvarDivisao() {
 }
 
 function formatarChaveSefaz(input) {
-    // 1. Remove tudo o que não for número (ignora espaços, letras, traços)
     let numeros = input.value.replace(/\D/g, '');
 
-    // 2. Trava exatamente em 44 números
     if (numeros.length > 44) {
         numeros = numeros.substring(0, 44);
     }
 
-    // 3. Devolve para o campo formatado com um espaço a cada 4 números
     input.value = numeros.replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
@@ -1439,24 +1587,22 @@ function adicionarItemManual() {
     const qty = parseFloat(qtyInput.value);
     const price = parseFloat(priceInput.value);
 
-    // Validação de segurança
     if (!name || isNaN(qty) || isNaN(price) || qty <= 0 || price <= 0) {
         alert("Preencha o nome, a quantidade e o valor total corretamente.");
         return;
     }
 
-    // Cria o objeto no mesmo padrão do Java/Gemini
     const novoItem = {
-        id: 'manual_' + Date.now(), // Gera um ID único
+        id: 'manual_' + Date.now(), 
         name: name,
         quantity: qty,
         price: price,
-        owner: 'HOUSE', // Padrão: vai para a casa
+        owner: 'HOUSE', 
         originalQty: qty,
-        unitPrice: price / qty // Descobre o valor unitário para a matemática não quebrar
+        unitPrice: price / qty 
     };
 
-    // Joga na lista e redesenha a tela
+
     itensNotaAtual.push(novoItem);
     renderizarItens();
 

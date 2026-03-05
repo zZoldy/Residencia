@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.app.residencia;
 
 import com.app.dto.DatabaseManager;
@@ -31,7 +27,6 @@ public class LoginServlet extends HttpServlet {
         Gson gson = new Gson();
 
         try {
-            // 1. Ler JSON
             StringBuilder sb = new StringBuilder();
             String s;
             while ((s = request.getReader().readLine()) != null) sb.append(s);
@@ -42,14 +37,12 @@ public class LoginServlet extends HttpServlet {
             try (Connection conn = DatabaseManager.getConnection()) {
                 
                 if ("LOGIN".equals(action)) {
-                    // 2. Validação Básica
                     if (!DatabaseManager.isValid(req.email, "EMAIL")) {
                         response.setStatus(400);
                         out.print("{\"success\": false, \"message\": \"Email inválido.\"}");
                         return;
                     }
 
-                    // Faz o JOIN para pegar os dados do usuário e da casa
                     String sql = "SELECT u.*, h.name as house_name, h.invite_code " +
                                  "FROM users u " +
                                  "LEFT JOIN houses h ON u.house_id = h.id " +
@@ -67,7 +60,7 @@ public class LoginServlet extends HttpServlet {
                         boolean isActive = rs.getBoolean("active");
                         
                         if (!isActive) {
-                            // CONTA DESATIVADA! Manda aviso para o Front-end perguntar se quer voltar.
+                            // CONTA DESATIVADA!
                             JsonObject ghostResponse = new JsonObject();
                             ghostResponse.addProperty("success", false);
                             ghostResponse.addProperty("requireReactivation", true);
@@ -77,7 +70,7 @@ public class LoginServlet extends HttpServlet {
                             return; // Interrompe o login aqui
                         }
 
-                        // === LOGIN NORMAL (SUCESSO) ===
+                        // === LOGIN NORMAL ===
                         JsonObject jsonResponse = new JsonObject();
                         jsonResponse.addProperty("success", true);
                         jsonResponse.addProperty("message", "Acesso Autorizado");
@@ -124,7 +117,6 @@ public class LoginServlet extends HttpServlet {
         }
     }
 
-    // Classe auxiliar atualizada para receber a ação de reativação
     private class UserLogin {
         String action;
         int user_id;

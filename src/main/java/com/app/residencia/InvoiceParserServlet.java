@@ -1,5 +1,6 @@
 package com.app.residencia;
 
+import com.app.dto.DatabaseManager;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -45,17 +46,17 @@ public class InvoiceParserServlet extends HttpServlet {
             if (fileName.endsWith(".pdf")) {
                 try (PDDocument document = PDDocument.load(fileContent)) {
                     PDFTextStripper stripper = new PDFTextStripper();
-                    stripper.setSortByPosition(true); // Mantemos a ordem visual
+                    stripper.setSortByPosition(true);
                     String textoSujoPDF = stripper.getText(document);
 
                     if (textoSujoPDF.length() < 20) {
                         throw new Exception("O documento PDF está vazio ou não pôde ser lido.");
                     }
 
-                    // --- INÍCIO DA CONEXÃO COM A IA ---
-                    String apiKey = "AIzaSyAdPF2SliZ6SraBO3PN6wb2i09grLOox_U"; // Sua chave
+                    // --- INÍCIO DA PREPARAÇÃO ---
+                    String apiKey = DatabaseManager.retornKeyApi();
                     String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey;
-                    
+                 
                     String prompt = "Você é um extrator de cupons fiscais. Vou te passar o texto sujo de um PDF de supermercado. "
                             + "Sua missão é IGNORAR cabeçalhos, CNPJ, palavras como 'DOCUMENTO AUXILIAR', endereços (QUADRA, S/N, LOTE), formas de pagamento, troco e códigos numéricos soltos. "
                             + "Retorne ESTRITAMENTE um array JSON válido, SEM marcações markdown (não use ```json), contendo APENAS os produtos de mercado válidos. "
@@ -75,50 +76,62 @@ public class InvoiceParserServlet extends HttpServlet {
                     JsonObject payloadIA = new JsonObject();
                     payloadIA.add("contents", contentsArray);
 
-                    // Dispara para a nuvem
-                    java.net.URL url = new java.net.URL(endpoint);
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setDoOutput(true);
+                    // --- LÓGICA DE RETRY (BLINDAGEM CONTRA ERRO 503) ---
+                    String iaResponseStr = "";
+                    int tentativas = 0;
+                    int maxTentativas = 3;
+                    boolean sucessoIA = false;
 
-                    try (java.io.OutputStream os = conn.getOutputStream()) {
-                        byte[] input = gson.toJson(payloadIA).getBytes("utf-8");
-                        os.write(input, 0, input.length);
-                    }
+                    while (tentativas < maxTentativas && !sucessoIA) {
+                        try {
+                            java.net.URL url = new java.net.URL(endpoint);
+                            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                            conn.setRequestMethod("POST");
+                            conn.setRequestProperty("Content-Type", "application/json");
+                            conn.setDoOutput(true);
 
-                    // === O SEGREDO ESTÁ AQUI: TRATAMENTO BLINDADO DE RESPOSTA HTTP ===
-                    int responseCode = conn.getResponseCode();
-                    InputStream inputStream;
+                            // Envia o JSON
+                            try (java.io.OutputStream os = conn.getOutputStream()) {
+                                byte[] input = gson.toJson(payloadIA).getBytes("utf-8");
+                                os.write(input, 0, input.length);
+                            }
 
-                    // Se a API retornar sucesso (200 OK), lemos o InputStream. Se der erro (400, 403, 500), lemos o ErrorStream.
-                    if (responseCode >= 200 && responseCode <= 299) {
-                        inputStream = conn.getInputStream();
-                    } else {
-                        inputStream = conn.getErrorStream();
-                    }
+                            int responseCode = conn.getResponseCode();
+                            
+                            // Se o Google estiver ocupado (503), lançamos erro para cair no Catch e tentar de novo
+                            if (responseCode == 503) {
+                                throw new Exception("503");
+                            }
 
-                    StringBuilder iaResponse = new StringBuilder();
-                    try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, "utf-8"))) {
-                        String responseLine;
-                        while ((responseLine = br.readLine()) != null) {
-                            iaResponse.append(responseLine.trim());
+                            InputStream inputStream = (responseCode >= 200 && responseCode <= 299) 
+                                                      ? conn.getInputStream() : conn.getErrorStream();
+
+                            StringBuilder sb = new StringBuilder();
+                            try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, "utf-8"))) {
+                                String line;
+                                while ((line = br.readLine()) != null) sb.append(line.trim());
+                            }
+
+                            if (responseCode != 200) {
+                                throw new Exception("Erro Google " + responseCode + ": " + sb.toString());
+                            }
+
+                            iaResponseStr = sb.toString();
+                            sucessoIA = true; // Sucesso! Sai do while
+
+                        } catch (Exception e) {
+                            if ("503".equals(e.getMessage()) && tentativas < maxTentativas - 1) {
+                                tentativas++;
+                                System.out.println("⚠️ Google ocupado (503). Tentando novamente (" + tentativas + ")...");
+                                Thread.sleep(2000); // Espera 2 segundos
+                            } else {
+                                throw e; // Outro erro ou fim das tentativas.
+                            }
                         }
                     }
 
-                    // Agora verificamos o código. Se explodiu, nós atiramos o erro exato do Google para a tela!
-                    if (responseCode != 200) {
-                        throw new Exception("O Google recusou a conexão (Erro " + responseCode + "): " + iaResponse.toString());
-                    }
-
-                    // Desempacota a resposta do Google
-                    JsonObject geminiResult = gson.fromJson(iaResponse.toString(), JsonObject.class);
-
-                    // Trava de segurança: Verifica se a IA devolveu o formato esperado
-                    if (!geminiResult.has("candidates")) {
-                        throw new Exception("A IA bloqueou a resposta ou retornou dados vazios. Resposta crua: " + iaResponse.toString());
-                    }
-
+                    // --- PROCESSAMENTO DA RESPOSTA DA IA ---
+                    JsonObject geminiResult = gson.fromJson(iaResponseStr, JsonObject.class);
                     String textoResposta = geminiResult.getAsJsonArray("candidates")
                             .get(0).getAsJsonObject()
                             .getAsJsonObject("content")
@@ -126,10 +139,7 @@ public class InvoiceParserServlet extends HttpServlet {
                             .get(0).getAsJsonObject()
                             .get("text").getAsString();
 
-                    // Limpa formatação Markdown
                     textoResposta = textoResposta.replace("```json", "").replace("```", "").trim();
-
-                    // Converte de volta para Java
                     JsonArray itensLimpos = gson.fromJson(textoResposta, JsonArray.class);
 
                     for (int i = 0; i < itensLimpos.size(); i++) {
@@ -137,13 +147,12 @@ public class InvoiceParserServlet extends HttpServlet {
                         p.addProperty("id", UUID.randomUUID().toString());
                         produtos.add(p);
                     }
-                    // --- FIM DA CONEXÃO COM A IA ---
                 }
-            } // ==========================================
-            // ROTA 2: PROCESSAMENTO DE HTML
+            } 
+            // ==========================================
+            // ROTA 2: PROCESSAMENTO DE HTML (JSOUP)
             // ==========================================
             else {
-                // ... (seu código HTML intacto omitido aqui para focar na leitura, mas ele está garantido se você colar tudo)
                 StringBuilder textBuilder = new StringBuilder();
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(fileContent, "UTF-8"))) {
                     String line;
@@ -169,19 +178,14 @@ public class InvoiceParserServlet extends HttpServlet {
                                 p.addProperty("price", Double.parseDouble(precoStr));
                                 produtos.add(p);
                             }
-                        } catch (Exception e) {
-                        }
+                        } catch (Exception e) {}
                     }
                 }
             }
 
-            // Validação Final
+            // Validação e Resposta Final
             if (produtos.size() == 0) {
-                JsonObject erro = new JsonObject();
-                erro.addProperty("status", "error");
-                erro.addProperty("message", "Nenhum produto extraído. Verifique o formato do documento.");
-                response.getWriter().write(gson.toJson(erro));
-                return;
+                throw new Exception("Nenhum produto extraído do documento.");
             }
 
             JsonObject resposta = new JsonObject();
@@ -190,14 +194,11 @@ public class InvoiceParserServlet extends HttpServlet {
             response.getWriter().write(gson.toJson(resposta));
 
         } catch (Exception e) {
-            // === LOGS DEFINITIVOS AQUI ===
-            e.printStackTrace(); // Isto vai imprimir o rastro de sangue vermelho no seu NetBeans
-
+            e.printStackTrace();
             response.setStatus(500);
             JsonObject erro = new JsonObject();
             erro.addProperty("status", "error");
-            // Adicionamos o 'e.getMessage()' para exibir o erro exato no alert() do JavaScript!
-            erro.addProperty("message", "Erro no processamento: " + e.getMessage());
+            erro.addProperty("message", "Erro: " + e.getMessage());
             response.getWriter().write(gson.toJson(erro));
         }
     }

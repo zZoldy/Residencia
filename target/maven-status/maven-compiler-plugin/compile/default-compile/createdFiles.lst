@@ -11,6 +11,7 @@ com\app\residencia\ProfileServlet$ProfileRequest.class
 com\app\residencia\WalletServlet$TransactionRequest.class
 com\app\dto\DatabaseManager.class
 com\app\residencia\LoginServlet$UserLogin.class
+com\app\residencia\WalletServlet$ItemNota.class
 com\app\residencia\HouseServlet.class
 com\app\residencia\RegisterServlet$FullRegistrationData.class
 com\app\residencia\AppShutdownListener.class

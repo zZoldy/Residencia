@@ -14,16 +14,14 @@ public class AppShutdownListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
-        // Opcional: O que fazer quando a Matrix (Tomcat) ligar
         System.out.println("[SYS] Conectando ao mainframe da Residência...");
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        // O que fazer quando o Tomcat desligar ou reiniciar (Clean & Build)
         System.out.println("[SYS] Encerrando conexões. Iniciando protocolo de limpeza...");
 
-        // 1. Mata a Thread Zumbi do MySQL que estava causando o seu erro
+        // Mata a Thread Zumbi do MySQL
         try {
             AbandonedConnectionCleanupThread.checkedShutdown();
             System.out.println("[SYS] CleanupThread do MySQL finalizada.");
@@ -31,7 +29,7 @@ public class AppShutdownListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        // 2. Desregistra os Drivers do Banco de Dados para liberar a memória
+        // Desregistra os Drivers do Banco de Dados para liberar a memória
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         Enumeration<Driver> drivers = DriverManager.getDrivers();
         while (drivers.hasMoreElements()) {

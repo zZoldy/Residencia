@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.app.residencia;
 
 import com.app.dto.DatabaseManager;
@@ -79,7 +75,7 @@ public class ProfileServlet extends HttpServlet {
             try (Connection conn = DatabaseManager.getConnection()) {
 
                 if ("UPDATE".equals(action)) {
-                    // === SALVAR PERFIL NORMAL ===
+                    // === SALVAR PERFIL ===
                     String sql = "UPDATE users SET name = ?, phone = ?, pix_key = ? WHERE id = ?";
                     PreparedStatement stmt = conn.prepareStatement(sql);
                     stmt.setString(1, req.name);
@@ -91,11 +87,10 @@ public class ProfileServlet extends HttpServlet {
                     out.print("{\"success\": true, \"message\": \"Perfil atualizado.\"}");
 
                 } else if ("DELETE".equals(action)) {
-                    // === LÓGICA DE DESTRUIÇÃO (ZONA DE RISCO) ===
-                    conn.setAutoCommit(false); // Inicia transação segura
+                    // === LÓGICA DE DESTRUIÇÃO ===
+                    conn.setAutoCommit(false); 
 
                     try {
-                        // 1. Conta quantos moradores tem na casa
                         String sqlCount = "SELECT COUNT(id) AS total FROM users WHERE house_id = ?";
                         PreparedStatement stmtCount = conn.prepareStatement(sqlCount);
                         stmtCount.setInt(1, req.house_id);
@@ -104,17 +99,14 @@ public class ProfileServlet extends HttpServlet {
                         int totalMoradores = rsCount.getInt("total");
 
                         if (totalMoradores == 1) {
-                            // REGRA 1: É o único morador. Destrói a casa.
-                            // (O ON DELETE CASCADE do banco vai apagar o usuário e as contas automaticamente)
+
                             String sqlDelHouse = "DELETE FROM houses WHERE id = ?";
                             PreparedStatement stmtDelHouse = conn.prepareStatement(sqlDelHouse);
                             stmtDelHouse.setInt(1, req.house_id);
                             stmtDelHouse.executeUpdate();
 
                         } else {
-                            // REGRA 2: Tem mais gente. Verifica se ele é o ADMIN
                             if ("ADMIN".equals(req.role)) {
-                                // Acha o morador mais antigo na casa (excluindo o que está saindo)
                                 String sqlNextAdmin = "SELECT id FROM users WHERE house_id = ? AND id != ? ORDER BY created_at ASC LIMIT 1";
                                 PreparedStatement stmtNext = conn.prepareStatement(sqlNextAdmin);
                                 stmtNext.setInt(1, req.house_id);
@@ -123,7 +115,6 @@ public class ProfileServlet extends HttpServlet {
 
                                 if (rsNext.next()) {
                                     int nextAdminId = rsNext.getInt("id");
-                                    // Promove o sucessor a ADMIN
                                     String sqlPromote = "UPDATE users SET role = 'ADMIN' WHERE id = ?";
                                     PreparedStatement stmtPromote = conn.prepareStatement(sqlPromote);
                                     stmtPromote.setInt(1, nextAdminId);
@@ -131,19 +122,17 @@ public class ProfileServlet extends HttpServlet {
                                 }
                             }
 
-                            // Depois de passar o bastão (ou se for só membro), deleta o usuário
-                            // (O ON DELETE CASCADE vai apagar as contas dele)
                             String sqlGhost = "UPDATE users SET active = FALSE, email = CONCAT('del_', id, '_', email), password_hash = 'DELETED' WHERE id = ?";
                             PreparedStatement stmtDelUser = conn.prepareStatement(sqlGhost);
                             stmtDelUser.setInt(1, req.user_id);
                             stmtDelUser.executeUpdate();
                         }
 
-                        conn.commit(); // Confirma a destruição
+                        conn.commit();
                         out.print("{\"success\": true, \"message\": \"Usuário desintegrado com sucesso.\"}");
 
                     } catch (Exception ex) {
-                        conn.rollback(); // Deu erro? Cancela a destruição!
+                        conn.rollback();
                         throw ex;
                     }
                 }
@@ -155,7 +144,6 @@ public class ProfileServlet extends HttpServlet {
         }
     }
 
-    // Estrutura atualizada para receber os novos campos
     private class ProfileRequest {
 
         String action;
