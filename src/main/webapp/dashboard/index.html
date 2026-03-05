@@ -29,6 +29,9 @@
                     <button class="nav-item" onclick="loadModule('WALLET')">
                         <span class="icon">📊</span> Despesas
                     </button>
+                    <button class="nav-item" onclick="loadModule('PANTRY')">
+                        <span class="icon">📦</span> Dispensa
+                    </button>
                     <button class="nav-item" onclick="loadModule('TASKS')">
                         <span class="icon">🧹</span> Tarefas
                     </button>
@@ -229,6 +232,25 @@
 
                 <div id="module-tasks" class="hidden"><h2>Tarefas (Em breve)</h2></div>
 
+                <div id="module-pantry" class="hidden module-container">
+                    <div class="wallet-header">
+                        <h2><span class="icon">📦</span> Logística de Suprimentos // DISPENSA</h2>
+                        <p>>_ Gestão de estoque e alertas de reposição automática.</p>
+                    </div>
+
+                    <div class="table-filters" style="margin-bottom: 20px;">
+                        <input type="text" id="pantry-search" class="matrix-input-field filter-input" placeholder="Procurar item..." oninput="filtrarDispensa()">
+                        <select id="pantry-filter-status" class="matrix-input-field filter-input" onchange="filtrarDispensa()">
+                            <option value="ALL">Todos os Itens</option>
+                            <option value="WARNING">Abaixo do Limite ⚠️</option>
+                            <option value="EMPTY">Esgotados</option>
+                        </select>
+                    </div>
+
+                    <div id="pantry-grid" class="pantry-grid">
+                    </div>
+                </div>
+
             </main>
         </div>
 
@@ -283,6 +305,11 @@
                                     [ REVISAR ITENS ]
                                 </button>
                             </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Data de Emissão</label>
+                            <input type="date" id="trans-nf-date" class="matrix-input-field">
                         </div>
 
                         <div class="input-group">
@@ -428,9 +455,8 @@
             </div>
 
             <div class="chat-input-area">
-                <input type="text" id="chat-input" class="matrix-input-field" placeholder="Transmitir mensagem..." onkeypress="if (event.key === 'Enter')
-                            enviarMensagemChat()">
-                <button class="btn-matrix" onclick="enviarMensagemChat()">[ > ]</button>
+                <textarea id="chat-input" class="matrix-input-field" placeholder="Transmitir mensagem..." rows="1"></textarea>
+                <button class="btn-matrix" onclick="enviarMensagemChat()"> > </button>
             </div>
         </div>
 

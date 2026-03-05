@@ -405,9 +405,9 @@ body {
     box-shadow: 0 0 15px rgba(255, 0, 0, 0.1);
 }
 
-.box-glow-cyan { 
-    border-color: #00ffff; 
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.1); 
+.box-glow-cyan {
+    border-color: #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.1);
 }
 
 .value-green {
@@ -871,41 +871,114 @@ body {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 15px;
     font-family: 'Segoe UI', sans-serif;
+}
+
+/* --- SEPARADOR DE DATA --- */
+.chat-date-separator {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 20px 0;
+    color: #444; /* Cinza escuro */
+    font-family: monospace;
+    font-size: 0.75rem;
+}
+
+.chat-date-separator::before,
+.chat-date-separator::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #222;
+}
+
+.chat-date-separator span {
+    padding: 0 10px;
+    letter-spacing: 2px;
 }
 
 /* Balões de Mensagem */
 .chat-msg {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 10px;
-    border-radius: 2px;
-    font-size: 0.9em;
-    border-left: 3px solid #555;
-    color: #ccc;
-    width: 85%;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 1em;
+    width: fit-content;
+    max-width: 85%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    margin-bottom: 5px;
+    position: relative;
+    display: flex;
+    flex-direction: column; /* Faz o nome ficar em cima da mensagem */
+
+    /* --- AS CHAVES PARA QUEBRAR A LINHA --- */
+    width: fit-content;      /* O balão se ajusta ao texto... */
+    max-width: 85%;          /* ...mas para no limite de 85% da tela */
+    word-wrap: break-word;    /* Força quebra de palavras longas */
+    overflow-wrap: break-word;/* Garante que o texto não saia do balão */
+    word-break: break-word;   /* Suporte para navegadores mais antigos */
+    white-space: pre-wrap;    /* Preserva quebras de linha manuais (Enter) */
+
 }
 
-/* Minhas Mensagens (Ficam na direita e verdes) */
-.chat-msg.me {
-    background: rgba(0, 255, 0, 0.08);
-    border-left: none;
-    border-right: 3px solid #00ff00;
-    align-self: flex-end;
-    color: #00ff00;
+.message-text {
+    word-wrap: break-word;
+    margin-bottom: 4px; /* Espaço para a hora não colar no texto */
 }
 
 .chat-msg .sender {
-    font-size: 0.75em;
-    color: #888;
     display: block;
     margin-bottom: 4px;
     font-family: monospace;
-    text-transform: uppercase;
+    font-size: 1em;
+}
+
+.chat-time {
+    font-size: 0.65rem;
+    font-family: monospace;
+    align-self: flex-end; /* Joga para o canto inferior direito */
+    opacity: 0.5;
+    margin-top: 2px;
+}
+
+/* ESTILO EXCLUSIVO: Outros moradores (Esquerda/Cinza) */
+.chat-msg:not(.me) {
+    background: rgba(60, 60, 60, 0.8);
+    border-left: 4px solid #444;
+    color: #eeeeee;
+    align-self: flex-start;
+}
+
+/* Cor da hora para suas mensagens */
+.chat-msg.me .chat-time {
+    color: #00ff00;
+}
+
+/* Cor da hora para mensagens recebidas */
+.chat-msg:not(.me) .chat-time {
+    color: #aaa;
+}
+
+.chat-msg:not(.me) .sender {
+    color: #aaa;
+    text-transform: none; /* Nome dos outros em minúsculo/normal */
+    text-align: left;
+}
+
+
+/* ESTILO EXCLUSIVO: Você (Direita/Verde) */
+.chat-msg.me {
+    background: #000000;
+    border-right: 3px solid #00ff00;
+    color: #00ff00;
+    align-self: flex-end;
 }
 
 .chat-msg.me .sender {
     color: #00aa00;
+    text-transform: uppercase; /* Só o seu nome em MAIÚSCULO */
     text-align: right;
 }
 
@@ -972,6 +1045,152 @@ body {
     background: rgba(0, 255, 255, 0.05) !important;
 }
 
+/* ======================================== */
+/*  Dispensa
+/* ========================================= */ 
+
+.pantry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* CARD DA DISPENSA */
+.pantry-card {
+    background: rgba(10, 10, 10, 0.95);
+    border: 1px solid #222;
+    border-left: 4px solid #00ff00; /* Padrão: Verde Matrix */
+    padding: 15px;
+    border-radius: 4px;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.pantry-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 255, 0, 0.1);
+}
+
+/* STATUS: REPOSIÇÃO (Abaixo do Limite) */
+.pantry-card.warning {
+    border-left-color: #ffaa00;
+    box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.05);
+}
+
+/* STATUS: ESGOTADO (Zero) */
+.pantry-card.empty {
+    border-left-color: #ff0000;
+    opacity: 0.7;
+}
+
+/* DETALHES INTERNOS DO CARD */
+.pantry-owner {
+    font-size: 0.65rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.pantry-name {
+    color: #fff;
+    font-size: 1.1rem;
+    margin: 5px 0;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.pantry-qty-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.pantry-qty-value {
+    font-family: monospace;
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #00ff00;
+}
+
+.pantry-card.warning .pantry-qty-value { color: #ffaa00; }
+.pantry-card.empty .pantry-qty-value { color: #ff0000; }
+
+/* BOTÕES DE AÇÃO */
+.btn-consume {
+    background: transparent;
+    border: 1px solid #333;
+    color: #888;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 0.8em;
+    transition: 0.2s;
+}
+
+.btn-consume:hover:not(:disabled) {
+    border-color: #ff0000;
+    color: #ff0000;
+    background: rgba(255, 0, 0, 0.05);
+}
+
+.btn-consume:disabled {
+    cursor: not-allowed;
+    border-color: #222;
+    color: #333;
+}
+
+/* =========================================
+   ESTILIZAÇÃO DE SCROLLBAR - MATRIX STYLE
+   ========================================= */
+
+/* Chrome, Edge e Safari */
+::-webkit-scrollbar {
+    width: 6px;               /* Largura da barra vertical */
+    height: 6px;              /* Altura da barra horizontal */
+}
+
+/* O "Caminho" da barra (Fundo) */
+::-webkit-scrollbar-track {
+    background: #050505;      /* Preto profundo da Matrix */
+}
+
+/* O "Arrastador" */
+::-webkit-scrollbar-thumb {
+    background: #00ff00;      /* Verde Neon */
+    border-radius: 10px;
+    box-shadow: 0 0 10px #00ff00; /* Efeito de brilho neon */
+}
+
+/* Quando o mouse passa por cima do scroll */
+::-webkit-scrollbar-thumb:hover {
+    background: #00ff00;
+    box-shadow: 0 0 15px #00ff00, inset 0 0 5px #ffffff;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #00ff00 #050505;
+}
+
+
+#chat-input {
+    resize: none; /* Proíbe o usuário de redimensionar manualmente */
+    height: 120px; /* Altura padrão de uma linha só, igual ao seu input anterior */
+    min-height: 40px;
+    max-height: 200px;
+    padding: 10px; /* Ajuste para o texto não ficar colado no topo */
+    line-height: 1.4;
+    overflow-y: hidden; /* Se o usuário pular muitas linhas, aparece um scroll discreto */
+    box-sizing: border-box;
+}
+
+#chat-input:focus {
+    border-color: #00ff00;
+    outline: none;
+}
+
 /* Garante que a janela não ultrapasse a altura da tela */
 #modal-transaction .matrix-window {
     max-height: 90vh;      /* Ocupa no máximo 90% da altura da visão */
@@ -1001,6 +1220,8 @@ body {
     border-radius: 10px;
     box-shadow: 0 0 10px #00ff00;
 }
+
+
 
 @keyframes blink {
     50% {

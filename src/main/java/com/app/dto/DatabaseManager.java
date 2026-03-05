@@ -1,18 +1,22 @@
 package com.app.dto;
 
+import com.google.gson.JsonObject;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 public class DatabaseManager {
 
-    private static final String URL = "jdbc:mysql://localhost:3306/residencia?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8";
+    private static final String URL = "jdbc:mysql://localhost:3306/residencia?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo&useUnicode=true&characterEncoding=UTF-8";
     private static final String USER = "Freecs";
     private static final String PASS = "#SQLUser02";
-
 
     static {
         try {
@@ -22,7 +26,6 @@ public class DatabaseManager {
             e.printStackTrace();
         }
     }
-
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASS);
@@ -56,7 +59,7 @@ public class DatabaseManager {
                 return Pattern.matches("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$", data);
 
             case "SENHA":
-                // Mínimo 4 caracteres (pode aumentar a regra aqui)
+                // Mínimo 4 caracteres (Modelo para TESTE)
                 return data.length() >= 4;
 
             case "NUMERO":
@@ -118,8 +121,8 @@ public class DatabaseManager {
                     if (item.has("owner") && !item.get("owner").isJsonNull()) {
                         String jsonOwner = item.get("owner").getAsString();
                         if ("ME".equals(jsonOwner)) {
-                            owner = "USER"; 
-                            owner = jsonOwner; 
+                            owner = "USER";
+                            owner = jsonOwner;
                         }
                     }
                     psInsert.setString(5, owner);
@@ -132,4 +135,100 @@ public class DatabaseManager {
             }
         }
     }
+
+    /**
+     * Sincroniza uma lista de itens com a tabela de estoque da casa (Pantry).
+     *
+     * @param houseId ID da residência
+     * @param itens Lista de itens (vindos do WalletServlet)
+     * @param loggedUserId ID do usuário que está registrando
+     */
+    public static void sincronizarDispensa(int houseId, List<ItemNota> itens, int loggedUserId) {
+        String sql = "INSERT INTO pantry_items (house_id, product_name, owner_name, quantity) "
+                + "VALUES (?, ?, ?, ?) "
+                + "ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)";
+
+        // Nomes dos moradores - rótulo da dispensa
+        Map<Integer, String> nomesMoradores = new HashMap<>();
+        String sqlUsers = "SELECT id, name FROM users WHERE house_id = ?";
+
+        try (Connection conn = getConnection()) {
+            // Busca nomes
+            try (PreparedStatement stmtUser = conn.prepareStatement(sqlUsers)) {
+                stmtUser.setInt(1, houseId);
+                ResultSet rs = stmtUser.executeQuery();
+                while (rs.next()) {
+                    nomesMoradores.put(rs.getInt("id"), rs.getString("name"));
+                }
+            }
+
+            // Processa o estoque em lote (Batch)
+            try (PreparedStatement stmtPantry = conn.prepareStatement(sql)) {
+                for (ItemNota item : itens) {
+                    String donoFinal = "CASA";
+
+                    if (!"HOUSE".equals(item.owner)) {
+                        int donoId = item.owner.startsWith("USER_")
+                                ? Integer.parseInt(item.owner.replace("USER_", ""))
+                                : loggedUserId;
+                        donoFinal = nomesMoradores.getOrDefault(donoId, "MORADOR").toUpperCase();
+                    }
+
+                    stmtPantry.setInt(1, houseId);
+                    stmtPantry.setString(2, item.name.toUpperCase().trim());
+                    stmtPantry.setString(3, donoFinal);
+                    stmtPantry.setDouble(4, item.quantity);
+                    stmtPantry.addBatch();
+                }
+                stmtPantry.executeBatch();
+                System.out.println("[DB_MANAGER] Sincronia de Dispensa: OK");
+            }
+        } catch (Exception e) {
+            System.err.println("[ERRO CRÍTICO DB] Falha na sincronia de dispensa: " + e.getMessage());
+        }
+    }
+    
+    /**
+ * Busca todos os itens da dispensa de uma casa.
+ */
+public static List<JsonObject> buscarItensDispensa(int houseId) {
+    List<JsonObject> lista = new ArrayList<>();
+    String sql = "SELECT * FROM pantry_items WHERE house_id = ? ORDER BY product_name ASC";
+
+    try (Connection conn = getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql)) {
+        
+        stmt.setInt(1, houseId);
+        ResultSet rs = stmt.executeQuery();
+
+        while (rs.next()) {
+            JsonObject item = new JsonObject();
+            item.addProperty("id", rs.getInt("id"));
+            item.addProperty("product_name", rs.getString("product_name"));
+            item.addProperty("owner_name", rs.getString("owner_name"));
+            item.addProperty("quantity", rs.getDouble("quantity"));
+            item.addProperty("unit", rs.getString("unit"));
+            lista.add(item);
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    return lista;
+}
+
+/**
+ * Reduz em 1 unidade a quantidade de um item.
+ */
+public static boolean consumirItemDispensa(int itemId) {
+    String sql = "UPDATE pantry_items SET quantity = quantity - 1 WHERE id = ? AND quantity > 0";
+    try (Connection conn = getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql)) {
+        
+        stmt.setInt(1, itemId);
+        return stmt.executeUpdate() > 0;
+    } catch (Exception e) {
+        e.printStackTrace();
+        return false;
+    }
+}
 }

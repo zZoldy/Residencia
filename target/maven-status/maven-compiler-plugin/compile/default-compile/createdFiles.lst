@@ -7,12 +7,13 @@ com\app\residencia\WalletServlet.class
 com\app\residencia\RegisterServlet.class
 com\app\residencia\ChatWebSocket.class
 com\app\residencia\JakartaRestConfiguration.class
+com\app\dto\ItemNota.class
 com\app\residencia\ProfileServlet$ProfileRequest.class
 com\app\residencia\WalletServlet$TransactionRequest.class
 com\app\dto\DatabaseManager.class
 com\app\residencia\LoginServlet$UserLogin.class
-com\app\residencia\WalletServlet$ItemNota.class
 com\app\residencia\HouseServlet.class
 com\app\residencia\RegisterServlet$FullRegistrationData.class
 com\app\residencia\AppShutdownListener.class
+com\app\residencia\PantryServlet.class
 com\app\residencia\LoginServlet.class

@@ -29,7 +29,7 @@ public class ChatWebSocket {
 
     @OnOpen
     public void onOpen(Session session, @PathParam("houseId") String houseId, @PathParam("userId") String userId) {
-        
+
         String userName = buscarNomeUsuario(userId);
         if (userName == null || !enviarHistorico(session, houseId, userId)) {
             cortarConexao(session);
@@ -56,12 +56,12 @@ public class ChatWebSocket {
             if (!verificarBancoAtivo()) {
                 cortarConexao(session);
             }
-            return; 
+            return;
         }
 
         String userName = houseSessions.get(houseId).get(session);
         int msgId = salvarMensagemNoBanco(houseId, userName, payload);
-        
+
         if (msgId == -1) { // Se o ID voltar -1, o banco caiu
             cortarConexao(session);
             return;
@@ -72,6 +72,7 @@ public class ChatWebSocket {
         json.addProperty("id", msgId);
         json.addProperty("sender", userName);
         json.addProperty("message", payload);
+        json.addProperty("timestamp", java.time.Instant.now().toString());
 
         broadcastToHouse(houseId, gson.toJson(json));
     }
@@ -87,7 +88,7 @@ public class ChatWebSocket {
 
     private boolean enviarHistorico(Session session, String houseId, String userId) {
         try (Connection conn = DatabaseManager.getConnection()) {
-            
+
             int lastReadId = 0;
             String sqlUser = "SELECT last_read_msg_id FROM users WHERE id = ?";
             PreparedStatement stmtUser = conn.prepareStatement(sqlUser);
@@ -97,7 +98,7 @@ public class ChatWebSocket {
                 lastReadId = rsUser.getInt("last_read_msg_id");
             }
 
-            String sqlChat = "SELECT id, sender_name, message FROM chat_messages WHERE house_id = ? ORDER BY id DESC LIMIT 50";
+            String sqlChat = "SELECT id, sender_name, message, created_at FROM chat_messages WHERE house_id = ? ORDER BY id DESC";
             PreparedStatement stmtChat = conn.prepareStatement(sqlChat);
             stmtChat.setInt(1, Integer.parseInt(houseId));
             ResultSet rsChat = stmtChat.executeQuery();
@@ -108,6 +109,12 @@ public class ChatWebSocket {
                 msg.addProperty("id", rsChat.getInt("id"));
                 msg.addProperty("sender", rsChat.getString("sender_name"));
                 msg.addProperty("message", rsChat.getString("message"));
+
+                if (rsChat.getTimestamp("created_at") != null) {
+                    // Isso transforma "2026-03-05 15:06:52" em "2026-03-05T15:06:52Z"
+                    msg.addProperty("timestamp", rsChat.getTimestamp("created_at").toInstant().toString());
+                }
+                System.out.println("Data - " + rsChat.getTimestamp("created_at").toString());
                 tempHistory.add(msg);
             }
             Collections.reverse(tempHistory);
@@ -139,10 +146,10 @@ public class ChatWebSocket {
             stmt.setString(2, userName);
             stmt.setString(3, encryptedMessage);
             stmt.executeUpdate();
-            
+
             ResultSet rs = stmt.getGeneratedKeys();
             if (rs.next()) {
-                return rs.getInt(1); 
+                return rs.getInt(1);
             }
             return -1;
         } catch (Exception e) {
@@ -171,13 +178,16 @@ public class ChatWebSocket {
             if (rs.next()) {
                 return rs.getString("name");
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
         return null;
     }
-    
+
     private void broadcastOnlineUsers(String houseId) {
         Map<Session, String> sessions = houseSessions.get(houseId);
-        if (sessions == null) return;
+        if (sessions == null) {
+            return;
+        }
         List<String> onlineUsers = new ArrayList<>(new java.util.HashSet<>(sessions.values()));
         JsonObject json = new JsonObject();
         json.addProperty("type", "USERS");
@@ -190,14 +200,24 @@ public class ChatWebSocket {
         if (sessions != null) {
             for (Session s : sessions.keySet()) {
                 if (s.isOpen()) {
-                    try { s.getBasicRemote().sendText(payload); } catch (IOException e) { e.printStackTrace(); }
+                    try {
+                        s.getBasicRemote().sendText(payload);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
     }
 
     private void cortarConexao(Session session) {
-        try { if (session.isOpen()) session.close(); } catch (IOException e) { e.printStackTrace(); }
+        try {
+            if (session.isOpen()) {
+                session.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private boolean verificarBancoAtivo() {

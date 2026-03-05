@@ -1,8 +1,7 @@
 /* ==========================================================================
- LÓGICA DO DASHBOARD (SECURE AREA)
+ LÓGICA DO DASHBOARD 
  ========================================================================== */
-
-// 1. GUARDA DE SEGURANÇA (Roda assim que abre o arquivo)
+//GUARDA DE SEGURANÇA 
 const userToken = localStorage.getItem('user_token'); // Mantive o nome padrão que estávamos usando
 
 if (!userToken) {
@@ -14,14 +13,13 @@ if (!userToken) {
 /**
  * Variáveis de Estado Global
  */
-
 let user = JSON.parse(userToken); // Dados do operador logado
 let todasTransacoes = []; // Armazena cache local de transações do banco
 let todosMembros = []; // Armazena a lista de moradores ativos
 let lastDataHash = ""; // Hash de telemetria para evitar re-renderizações desnecessárias
 let syncInterval; // Motor de pooling para atualizações em tempo real
 
-// --- 2. INICIALIZAÇÃO DA MATRIX ---
+// INICIALIZAÇÃO DA MATRIX ---
 document.addEventListener("DOMContentLoaded", () => {
     carregarDadosUsuario();
 
@@ -92,6 +90,9 @@ function loadModule(moduleName) {
     document.getElementById('module-wallet').classList.add('hidden');
     document.getElementById('module-tasks').classList.add('hidden');
     document.getElementById('module-profile').classList.add('hidden');
+    const pantryModule = document.getElementById('module-pantry');
+    if (pantryModule)
+        pantryModule.classList.add('hidden'); // Proteção extra
 
     if (moduleName === 'HOME') {
         document.getElementById('module-home').classList.remove('hidden');
@@ -103,6 +104,11 @@ function loadModule(moduleName) {
         carregarPerfil();
     } else if (moduleName === 'TASKS') {
         document.getElementById('module-tasks').classList.remove('hidden');
+    } else if (moduleName === 'PANTRY') {
+        if (pantryModule) {
+            pantryModule.classList.remove('hidden');
+            carregarDispensa(); // Gatilho para buscar dados no banco
+        }
     }
 
     // Auto-collapse no mobilear
@@ -596,6 +602,7 @@ async function salvarTransacao(event) {
         nf_key: document.getElementById('trans-nf').value.replace(/\s/g, ''),
         status: document.getElementById('trans-status').value,
         isShared: desejaDividir,
+        nf_date: document.getElementById('trans-nf-date') ? document.getElementById('trans-nf-date').value : null,
         due_date: document.getElementById('trans-due-date') ? document.getElementById('trans-due-date').value : null,
         observation: document.getElementById('trans-obs') ? document.getElementById('trans-obs').value : "",
         items: itensNotaAtual.length > 0 ? itensNotaAtual : null
@@ -607,7 +614,7 @@ async function salvarTransacao(event) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
-        const data = await response.json();
+        const data = awaRit response.json();
 
         if (data.success) {
             fecharModalTransacao();
@@ -1073,7 +1080,7 @@ function atualizarUsuariosOnline(listaUsuarios) {
         const li = document.createElement('li');
         li.style.marginBottom = "5px";
 
-        // Destaca você de verde, os outros ficam em Ciano Matrix
+        // Destaca você de verde, os outros ficam em Cinza
         if (nome === user.name) {
             li.style.color = "#00ff00";
             li.innerHTML = `● ${nome} (Você)`;
@@ -1141,18 +1148,76 @@ function enviarMensagemChat() {
     input.value = "";
 }
 
-function desenharMensagem(remetente, msgCriptografada) {
+// Localize onde você inicializa o chat e adicione este listener:
+const chatInput = document.getElementById('chat-input');
+
+chatInput.addEventListener('input', function () {
+    // Reseta a altura para calcular o novo scrollHeight
+    this.style.height = '120px';
+
+    // Define a nova altura baseada no conteúdo, respeitando o max-height do CSS
+    const novaAltura = this.scrollHeight;
+    this.style.height = novaAltura + 'px';
+
+    // Se atingir o limite de 200px, libera o scroll interno
+    if (novaAltura >= 200) {
+        this.style.overflowY = 'auto';
+    } else {
+        this.style.overflowY = 'hidden';
+    }
+});
+
+chatInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') {
+        if (event.shiftKey) {
+            // SHIFT + ENTER: O navegador pula a linha normalmente dentro do textarea
+        } else {
+            // APENAS ENTER: Dispara o envio e bloqueia a quebra de linha
+            event.preventDefault();
+            enviarMensagemChat();
+        }
+    }
+});
+
+let ultimaDataChat = ""; // Controle global de data
+
+/**
+ * Renderiza a mensagem na tela com data e hora.
+ * @param {string} remetente - Nome de quem enviou.
+ * @param {string} msgCriptografada - Texto em Base64.
+ * @param {string} dataHoraISO - (Opcional) Data vinda do banco.
+ */
+function desenharMensagem(remetente, msgCriptografada, dataHoraISO = null) {
     const chatBox = document.getElementById('chat-messages');
     const msgLimpa = decriptarMatrix(msgCriptografada);
-    const msgDiv = document.createElement('div');
 
-    if (remetente === user) {
-        msgDiv.className = 'chat-msg me';
-    } else {
-        msgDiv.className = 'chat-msg';
+    // Tratamento de Data e Hora
+    const dataObj = dataHoraISO ? new Date(dataHoraISO) : new Date();
+    const dia = dataObj.getDate().toString().padStart(2, '0');
+    const mes = (dataObj.getMonth() + 1).toString().padStart(2, '0');
+    const dataAtual = `${dia}/${mes}`;
+    const horaFormatada = dataObj.getHours().toString().padStart(2, '0') + ":" + dataObj.getMinutes().toString().padStart(2, '0');
+
+    // Inserção do Separador de Data 
+    if (dataAtual !== ultimaDataChat) {
+        const separator = document.createElement('div');
+        separator.className = 'chat-date-separator';
+        separator.innerHTML = `<span>DIA ${dataAtual}</span>`;
+        chatBox.appendChild(separator);
+        ultimaDataChat = dataAtual;
     }
 
-    msgDiv.innerHTML = `<span class="sender">${remetente}</span>${msgLimpa}`;
+    // Criação do Balão
+    const msgDiv = document.createElement('div');
+    const souEu = (remetente === user.name);
+    msgDiv.className = souEu ? 'chat-msg me' : 'chat-msg';
+
+    msgDiv.innerHTML = `
+        <span class="sender">${remetente}</span>
+        <div class="message-text">${msgLimpa}</div>
+        <span class="chat-time">${horaFormatada}</span>
+    `;
+
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }
@@ -1172,7 +1237,6 @@ function iniciarComLink() {
     const btnChat = document.querySelector('.chat-input-area .btn-matrix');
 
     chatSocket.onopen = function () {
-        console.log(">> COM-LINK ESTABELECIDO <<");
         const statusIcon = document.getElementById('chat-status-icon');
         const statusText = document.getElementById('chat-status-text');
 
@@ -1202,7 +1266,7 @@ function iniciarComLink() {
         const sidebar = document.getElementById('chat-sidebar');
         const isChatOpen = sidebar && sidebar.classList.contains('open');
 
-        const meuNome = user;
+        const meuNome = user.name;
 
         if (pacote.type === 'HISTORY') {
             const chatBox = document.getElementById('chat-messages');
@@ -1213,7 +1277,7 @@ function iniciarComLink() {
             let temMensagemMinhaNaoLida = false;
 
             pacote.messages.forEach(msg => {
-                desenharMensagem(msg.sender, msg.message);
+                desenharMensagem(msg.sender, msg.message, msg.timestamp);
 
                 if (msg.id > maiorIdMensagemRecebido)
                     maiorIdMensagemRecebido = msg.id;
@@ -1240,7 +1304,7 @@ function iniciarComLink() {
             }
 
         } else if (pacote.type === 'MESSAGE') {
-            desenharMensagem(pacote.sender, pacote.message);
+            desenharMensagem(pacote.sender, pacote.message, pacote.timestamp);
 
             if (pacote.id > maiorIdMensagemRecebido)
                 maiorIdMensagemRecebido = pacote.id;
@@ -1335,6 +1399,34 @@ function buscarSefaz() {
 
 function abrirModalDivisor(isReadOnly = false) {
     document.getElementById('modal-divisor-nota').classList.remove('hidden');
+
+    // 1. Identifica os elementos de controle
+    const btnSalvar = document.getElementById('btn-salvar-divisao'); // Ajuste o ID se for diferente
+    const areaManual = document.querySelector('.manual-add-area'); // A div que contém os inputs de nome/qtd/preço manual
+    const tituloModal = document.querySelector('#modal-divisor-nota h2'); // O título do modal
+
+    if (isReadOnly) {
+        // --- MODO AUDITORIA (REVISÃO) ---
+        if (btnSalvar)
+            btnSalvar.style.setProperty('display', 'none', 'important');
+        if (areaManual)
+            areaManual.style.setProperty('display', 'none', 'important');
+        if (tituloModal)
+            tituloModal.innerText = "🔍 REVISÃO DE ITENS (SOMENTE LEITURA)";
+
+        console.log("[LOGISTICA] Modal aberto em modo somente leitura. Controles ocultados.");
+    } else {
+        // --- MODO EDIÇÃO ATIVA ---
+        if (btnSalvar)
+            btnSalvar.style.display = 'block';
+        if (areaManual)
+            areaManual.style.display = 'flex';
+        if (tituloModal)
+            tituloModal.innerText = "📋 DIVISOR DE ITENS DA NOTA";
+    }
+
+    modal.classList.remove('hidden');
+
     renderizarItens(isReadOnly);
 }
 
@@ -1365,7 +1457,7 @@ async function enviarArquivoNota() {
     const textoOriginal = btnUpload.innerText;
 
     btnUpload.innerHTML = "⏳ PROCESSANDO IA... AGUARDE";
-    btnUpload.style.color = "#00ffff"; 
+    btnUpload.style.color = "#00ffff";
     btnUpload.style.borderColor = "#00ffff";
     btnUpload.disabled = true;
     document.body.style.cursor = "wait"; // Muda o mouse para a ampulheta
@@ -1378,14 +1470,30 @@ async function enviarArquivoNota() {
         const data = await response.json();
 
         if (data.status === 'success') {
-            itensNotaAtual = data.items.map(item => {
-                return {
-                    ...item,
-                    owner: 'HOUSE',
-                    originalQty: item.quantity,
-                    unitPrice: item.price / item.quantity
-                };
-            });
+
+            if (data.invoice_date) {
+                // Preenche o campo de data no modal
+                document.getElementById('trans-nf-date').value = data.invoice_date;
+            }
+            if (data.items && data.items.length > 0) {
+                itensNotaAtual = data.items.map(item => ({
+                        ...item,
+                        owner: 'HOUSE',
+                        unitPrice: item.price / item.quantity
+                    }));
+
+                abrirModalDivisor();
+            }
+
+            const temValorCasa = itensNotaAtual.some(i => i.owner === 'HOUSE');
+            if (temValorCasa) {
+                const selectShared = document.getElementById('trans-shared');
+                if (selectShared) {
+                    selectShared.value = 'true'; // Altera para "Dividida"
+                    console.log("[IA] Rateio ativado automaticamente: Itens da Casa detectados.");
+                }
+            }
+
             const hiddenItens = document.getElementById('itens_nota_json_input');
             if (hiddenItens)
                 hiddenItens.value = JSON.stringify(itensNotaAtual);
@@ -1451,7 +1559,7 @@ function renderizarItens(isReadOnly = false) {
     itensNotaAtual.forEach((item, index) => {
         const precoNum = parseFloat(item.price) || 0;
 
-        let corDono = '#00ff00'; 
+        let corDono = '#00ff00';
         let nomeDonoVisual = '🏠 CASA';
 
         // 'USER' ou 'ME' referem-se ao criador da conta (idDonoDaConta)
@@ -1462,10 +1570,10 @@ function renderizarItens(isReadOnly = false) {
         } else if (pertenceAoCriador) {
             totalMeu += precoNum;
             if (souEuODono) {
-                corDono = '#ffaa00'; 
+                corDono = '#ffaa00';
                 nomeDonoVisual = '🙋‍♂️ MEU';
             } else {
-                corDono = '#00aaff'; 
+                corDono = '#00aaff';
                 nomeDonoVisual = `👤 ${nomeDonoDaConta.split(' ')[0]}`;
             }
         } else if (item.owner && item.owner.startsWith('USER_')) {
@@ -1593,13 +1701,13 @@ function adicionarItemManual() {
     }
 
     const novoItem = {
-        id: 'manual_' + Date.now(), 
+        id: 'manual_' + Date.now(),
         name: name,
         quantity: qty,
         price: price,
-        owner: 'HOUSE', 
+        owner: 'HOUSE',
         originalQty: qty,
-        unitPrice: price / qty 
+        unitPrice: price / qty
     };
 
 
@@ -1611,4 +1719,125 @@ function adicionarItemManual() {
     qtyInput.value = '';
     priceInput.value = '';
     nameInput.focus();
+}
+
+// ==========================================
+// DISPENSA
+// ==========================================
+
+/**
+ * Busca os itens da dispensa via API e inicia a renderização.
+ */
+async function carregarDispensa() {
+    console.log("[LOGISTICA] Iniciando varredura de estoque...");
+
+    try {
+        // Seguindo o seu padrão de URL relativa
+        const response = await fetch(`../api/pantry?houseId=${user.house_id}`);
+        const itens = await response.json();
+
+        // Guardamos no cache global para o filtro de busca funcionar instantaneamente
+        window.todosItensDispensa = itens;
+
+        // Chama a função de desenho que você já tem
+        renderizarDispensa(itens);
+
+    } catch (e) {
+        console.error("[CRÍTICO] Falha ao sincronizar dispensa:", e);
+        const grid = document.getElementById('pantry-grid');
+        if (grid) {
+            grid.innerHTML = `<p style="color: #ff0000; font-family: monospace; padding: 20px;">
+                >_ ERRO DE CONEXÃO: SINAL COM O ESTOQUE PERDIDO.
+            </p>`;
+        }
+    }
+}
+
+function renderizarDispensa(itens) {
+    const grid = document.getElementById('pantry-grid');
+    grid.innerHTML = "";
+
+    // Limite definido no perfil do usuário (ou 1 por padrão)
+    const threshold = user.pantry_threshold || 1;
+
+    itens.forEach(item => {
+        let statusClass = "";
+        let statusLabel = "DISPONÍVEL";
+
+        if (item.quantity <= 0) {
+            statusClass = "empty";
+            statusLabel = "ESGOTADO";
+        } else if (item.quantity <= threshold) {
+            statusClass = "warning";
+            statusLabel = "REPOR";
+        }
+
+        const card = document.createElement('div');
+        card.className = `pantry-card ${statusClass}`;
+        card.innerHTML = `
+            <div class="pantry-info">
+                <span class="pantry-owner">${item.owner_name}</span>
+                <h3 class="pantry-name">${item.product_name}</h3>
+                <small style="color: #555; font-family: monospace;">STATUS: ${statusLabel}</small>
+            </div>
+            
+            <div class="pantry-qty-area">
+                <span class="pantry-qty-value">${item.quantity} <span style="font-size: 0.6em;">${item.unit}</span></span>
+                <button class="btn-consume" 
+                        onclick="darBaixaDispensa(${item.id})" 
+                        ${item.quantity <= 0 ? 'disabled' : ''}>
+                    CONSUMIR -1
+                </button>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+/**
+ * Filtro em tempo real (Busca e Status)
+ */
+function filtrarDispensa() {
+    const termo = document.getElementById('pantry-search').value.toUpperCase();
+    const filtroStatus = document.getElementById('pantry-filter-status').value;
+    const threshold = user.pantry_threshold || 1;
+
+    const filtrados = window.todosItensDispensa.filter(item => {
+        const matchesBusca = item.product_name.toUpperCase().includes(termo) ||
+                item.owner_name.toUpperCase().includes(termo);
+
+        let matchesStatus = true;
+        if (filtroStatus === 'EMPTY')
+            matchesStatus = item.quantity <= 0;
+        if (filtroStatus === 'WARNING')
+            matchesStatus = item.quantity > 0 && item.quantity <= threshold;
+
+        return matchesBusca && matchesStatus;
+    });
+
+    renderizarDispensa(filtrados);
+}
+
+/**
+ * Envia comando de consumo para o Servidor e atualiza o estoque local.
+ * * @param {number|string} itemId - O identificador único do item na tabela pantry_items.
+ */
+async function darBaixaDispensa(itemId) {
+    try {
+        const response = await fetch(`/api/pantry/consume`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                id: itemId,
+                houseId: user.house_id,
+                userId: user.id
+            })
+        });
+
+        if (response.ok) {
+            carregarDispensa(); // Recarrega a grade
+        }
+    } catch (e) {
+        alert("Falha na comunicação com o servidor de estoque.");
+    }
 }

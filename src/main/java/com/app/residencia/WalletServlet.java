@@ -1,6 +1,7 @@
 package com.app.residencia;
 
 import com.app.dto.DatabaseManager;
+import com.app.dto.ItemNota;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -36,7 +37,7 @@ public class WalletServlet extends HttpServlet {
         }
 
         int houseId = Integer.parseInt(houseIdParam);
-        int loggedUserId = (userIdParam != null) ? Integer.parseInt(userIdParam) : 0; 
+        int loggedUserId = (userIdParam != null) ? Integer.parseInt(userIdParam) : 0;
 
         try (Connection conn = DatabaseManager.getConnection()) {
             String sql = "SELECT t.*, u.name as user_name, u.active as user_active FROM transactions t "
@@ -59,7 +60,7 @@ public class WalletServlet extends HttpServlet {
             while (rs.next()) {
                 JsonObject t = new JsonObject();
                 int transId = rs.getInt("id");
-                String description = rs.getString("description"); 
+                String description = rs.getString("description");
                 int transUserId = rs.getInt("user_id");
                 double amount = rs.getDouble("amount");
                 String status = rs.getString("status");
@@ -77,6 +78,10 @@ public class WalletServlet extends HttpServlet {
 
                 Date dueDate = rs.getDate("due_date");
                 t.addProperty("due_date", (dueDate != null) ? dueDate.toString() : "");
+
+                Date nfDate = rs.getDate("nf_date");
+                t.addProperty("nf_date", (nfDate != null) ? nfDate.toString() : "");
+
                 t.addProperty("observation", rs.getString("observation") != null ? rs.getString("observation") : "");
 
                 try {
@@ -184,7 +189,7 @@ public class WalletServlet extends HttpServlet {
 
             try (Connection conn = DatabaseManager.getConnection()) {
 
-               if ("CREATE".equals(action)) {
+                if ("CREATE".equals(action)) {
                     if (!DatabaseManager.isValid(req.description, "TEXTO") || req.amount <= 0) {
                         out.print("{\"success\": false, \"message\": \"Dados inválidos.\"}");
                         return;
@@ -207,7 +212,7 @@ public class WalletServlet extends HttpServlet {
                                     try {
                                         donoId = Integer.parseInt(item.owner.replace("USER_", ""));
                                     } catch (Exception e) {
-                                        donoId = req.user_id; 
+                                        donoId = req.user_id;
                                     }
                                 } else if ("ME".equals(item.owner)) {
                                     donoId = req.user_id;
@@ -218,8 +223,9 @@ public class WalletServlet extends HttpServlet {
                                 itensPorUsuario.get(donoId).add(item);
                             }
                         }
+
                     } else {
-                        amountCasa = req.amount; 
+                        amountCasa = req.amount;
                     }
 
                     if (amountCasa > 0) {
@@ -240,7 +246,7 @@ public class WalletServlet extends HttpServlet {
 
                             double valorDividido = amountCasa / moradores.size();
 
-                            String sqlInsert = "INSERT INTO transactions (house_id, user_id, description, amount, nf_key, status, due_date, observation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                            String sqlInsert = "INSERT INTO transactions (house_id, user_id, description, amount, nf_key, status, due_date, observation, nf_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
                             PreparedStatement stmtInsert = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS);
 
                             for (UserCota m : moradores) {
@@ -258,6 +264,8 @@ public class WalletServlet extends HttpServlet {
                                 }
 
                                 stmtInsert.setString(8, (req.observation != null && !req.observation.trim().isEmpty()) ? req.observation : null);
+                                stmtInsert.setDate(9, (req.nf_date != null && !req.nf_date.isEmpty()) ? Date.valueOf(req.nf_date) : null);
+
                                 stmtInsert.executeUpdate();
 
                                 try (ResultSet keys = stmtInsert.getGeneratedKeys()) {
@@ -269,8 +277,11 @@ public class WalletServlet extends HttpServlet {
                                     }
                                 }
                             }
+                            if (req.items != null && !req.items.isEmpty()) {
+                                DatabaseManager.sincronizarDispensa(req.house_id, req.items, req.user_id);
+                            }
                         } else {
-                            String sql = "INSERT INTO transactions (house_id, user_id, description, amount, nf_key, status, due_date, observation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                            String sql = "INSERT INTO transactions (house_id, user_id, description, amount, nf_key, status, due_date, observation, nf_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
                             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
 
                             stmt.setInt(1, req.house_id);
@@ -287,6 +298,8 @@ public class WalletServlet extends HttpServlet {
                             }
 
                             stmt.setString(8, (req.observation != null && !req.observation.trim().isEmpty()) ? req.observation : null);
+                            stmt.setDate(9, (req.nf_date != null && !req.nf_date.isEmpty()) ? Date.valueOf(req.nf_date) : null);
+
                             stmt.executeUpdate();
 
                             try (ResultSet keys = stmt.getGeneratedKeys()) {
@@ -318,7 +331,7 @@ public class WalletServlet extends HttpServlet {
                             stmtPess.setString(3, descPessoal);
                             stmtPess.setDouble(4, amountPessoal);
                             stmtPess.setString(5, (req.nf_key != null && !req.nf_key.trim().isEmpty()) ? req.nf_key : null);
-                            
+
                             String statusPessoal = (idMorador == req.user_id) ? req.status : "PENDING";
                             stmtPess.setString(6, statusPessoal);
 
@@ -346,11 +359,11 @@ public class WalletServlet extends HttpServlet {
                     out.print("{\"success\": true, \"message\": \"Despesa processada com sucesso! Rateios e itens distribuídos.\"}");
                 } else if ("EDIT".equals(action)) {
 
-                    String sqlUpdate = "UPDATE transactions SET description = ?, amount = ?, due_date = ?, observation = ?, nf_key = ?, status = ? WHERE id = ? AND house_id = ? AND user_id = ?";
+                    String sqlUpdate = "UPDATE transactions SET description = ?, amount = ?, due_date = ?, observation = ?, nf_key = ?, status = ?, nf_date  = ? WHERE id = ? AND house_id = ? AND user_id = ?";
                     PreparedStatement stmtUpdate = conn.prepareStatement(sqlUpdate);
 
                     stmtUpdate.setString(1, req.description);
-                    stmtUpdate.setDouble(2, req.amount); 
+                    stmtUpdate.setDouble(2, req.amount);
 
                     if (req.due_date != null && !req.due_date.trim().isEmpty()) {
                         stmtUpdate.setDate(3, java.sql.Date.valueOf(req.due_date));
@@ -361,10 +374,10 @@ public class WalletServlet extends HttpServlet {
                     stmtUpdate.setString(4, (req.observation != null && !req.observation.trim().isEmpty()) ? req.observation : null);
                     stmtUpdate.setString(5, (req.nf_key != null && !req.nf_key.trim().isEmpty()) ? req.nf_key : null);
                     stmtUpdate.setString(6, req.status);
-
-                    stmtUpdate.setInt(7, req.transaction_id);
-                    stmtUpdate.setInt(8, req.house_id);
-                    stmtUpdate.setInt(9, req.user_id);
+                    stmtUpdate.setDate(7, (req.nf_date != null && !req.nf_date.isEmpty()) ? Date.valueOf(req.nf_date) : null);
+                    stmtUpdate.setInt(8, req.transaction_id);
+                    stmtUpdate.setInt(9, req.house_id);
+                    stmtUpdate.setInt(10, req.user_id);
 
                     int rows = stmtUpdate.executeUpdate();
                     if (rows > 0) {
@@ -396,11 +409,26 @@ public class WalletServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Busca um mapa de ID -> Nome para rotular os itens na dispensa.
+     */
+    private Map<Integer, String> buscarNomesMoradores(Connection conn, int houseId) throws SQLException {
+        Map<Integer, String> mapa = new HashMap<>();
+        String sql = "SELECT id, name FROM users WHERE house_id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, houseId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                mapa.put(rs.getInt("id"), rs.getString("name"));
+            }
+        }
+        return mapa;
+    }
+
     // ============================================================
     // CLASSES AUXILIARES (BLINDADAS PARA O GSON NÃO FALHAR)
     // ============================================================
     private class TransactionRequest {
-
         String action;
         int transaction_id;
         int house_id;
@@ -411,17 +439,9 @@ public class WalletServlet extends HttpServlet {
         String status;
         boolean isShared;
         String due_date;
+        String nf_date;
         String observation;
-
         List<ItemNota> items;
-    }
-
-    private class ItemNota {
-
-        String name;
-        double quantity;
-        double price;
-        String owner;
     }
 
     private class UserCota {

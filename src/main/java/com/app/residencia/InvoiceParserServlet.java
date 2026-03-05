@@ -39,6 +39,7 @@ public class InvoiceParserServlet extends HttpServlet {
             String fileName = filePart.getSubmittedFileName().toLowerCase();
             InputStream fileContent = filePart.getInputStream();
             JsonArray produtos = new JsonArray();
+            String dataDaNota = null;
 
             // ==========================================
             // ROTA 1: PROCESSAMENTO DE PDF (VIA GEMINI AI)
@@ -56,13 +57,16 @@ public class InvoiceParserServlet extends HttpServlet {
                     // --- INÍCIO DA PREPARAÇÃO ---
                     String apiKey = DatabaseManager.retornKeyApi();
                     String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey;
-                 
-                    String prompt = "Você é um extrator de cupons fiscais. Vou te passar o texto sujo de um PDF de supermercado. "
-                            + "Sua missão é IGNORAR cabeçalhos, CNPJ, palavras como 'DOCUMENTO AUXILIAR', endereços (QUADRA, S/N, LOTE), formas de pagamento, troco e códigos numéricos soltos. "
-                            + "Retorne ESTRITAMENTE um array JSON válido, SEM marcações markdown (não use ```json), contendo APENAS os produtos de mercado válidos. "
-                            + "Formato exigido: [{\"name\": \"NOME LIMPO DO PRODUTO\", \"quantity\": 1.0, \"price\": 10.50}]. "
-                            + "Se houver itens repetidos, some as quantidades e o 'price' total. "
-                            + "O campo 'price' é sempre o valor TOTAL do item (quantidade * valor unitário). "
+
+                    String prompt = "Você é um extrator de dados de alta precisão especializado em cupons fiscais (NFC-e). "
+                            + "Sua missão é extrair produtos e a DATA DE EMISSÃO do cupom, ignorando metadados (CNPJ, endereço, rodapés, formas de pagamento). "
+                            + "REGRAS DE OURO: "
+                            + "1. Limpeza Inteligente: Remova códigos e marcas irrelevantes, mas MANTENHA o tipo e sabor de bebidas e itens específicos (Ex: 'Coca-cola 2L', 'Guaraná 200ml', 'Cerveja Heineken'). Para outros itens, seja essencial (Ex: 'ARROZ'). "
+                            + "2. Quantidade: Para itens KG, extraia o valor decimal. Para UN, o valor inteiro. "
+                            + "3. Preço: O campo 'price' deve ser o valor TOTAL da linha (qtd * valor_unitário). "
+                            + "4. Agrupamento: Some itens idênticos em uma única entrada. "
+                            + "5. Resposta: Retorne ESTRITAMENTE um objeto JSON puro, sem markdown (```json). "
+                            + "Formato exigido: { \"invoice_date\": \"YYYY-MM-DD\", \"items\": [{ \"name\": \"PRODUTO\", \"quantity\": 0.0, \"price\": 0.0 }] } "
                             + "Texto da nota: \n\n" + textoSujoPDF;
 
                     JsonObject textPart = new JsonObject();
@@ -97,19 +101,21 @@ public class InvoiceParserServlet extends HttpServlet {
                             }
 
                             int responseCode = conn.getResponseCode();
-                            
+
                             // Se o Google estiver ocupado (503), lançamos erro para cair no Catch e tentar de novo
                             if (responseCode == 503) {
                                 throw new Exception("503");
                             }
 
-                            InputStream inputStream = (responseCode >= 200 && responseCode <= 299) 
-                                                      ? conn.getInputStream() : conn.getErrorStream();
+                            InputStream inputStream = (responseCode >= 200 && responseCode <= 299)
+                                    ? conn.getInputStream() : conn.getErrorStream();
 
                             StringBuilder sb = new StringBuilder();
                             try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, "utf-8"))) {
                                 String line;
-                                while ((line = br.readLine()) != null) sb.append(line.trim());
+                                while ((line = br.readLine()) != null) {
+                                    sb.append(line.trim());
+                                }
                             }
 
                             if (responseCode != 200) {
@@ -140,7 +146,16 @@ public class InvoiceParserServlet extends HttpServlet {
                             .get("text").getAsString();
 
                     textoResposta = textoResposta.replace("```json", "").replace("```", "").trim();
-                    JsonArray itensLimpos = gson.fromJson(textoResposta, JsonArray.class);
+                    // 1. Lemos como JsonObject agora (a caixa)
+                    JsonObject objetoExtraido = gson.fromJson(textoResposta, JsonObject.class);
+
+                    // 2. Pegamos a data
+                    if (objetoExtraido.has("invoice_date")) {
+                        dataDaNota = objetoExtraido.get("invoice_date").getAsString();
+                    }
+
+                    // 3. Pegamos a lista de itens dentro do objeto
+                    JsonArray itensLimpos = objetoExtraido.getAsJsonArray("items");
 
                     for (int i = 0; i < itensLimpos.size(); i++) {
                         JsonObject p = itensLimpos.get(i).getAsJsonObject();
@@ -148,8 +163,7 @@ public class InvoiceParserServlet extends HttpServlet {
                         produtos.add(p);
                     }
                 }
-            } 
-            // ==========================================
+            } // ==========================================
             // ROTA 2: PROCESSAMENTO DE HTML (JSOUP)
             // ==========================================
             else {
@@ -178,7 +192,8 @@ public class InvoiceParserServlet extends HttpServlet {
                                 p.addProperty("price", Double.parseDouble(precoStr));
                                 produtos.add(p);
                             }
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                        }
                     }
                 }
             }
@@ -190,6 +205,7 @@ public class InvoiceParserServlet extends HttpServlet {
 
             JsonObject resposta = new JsonObject();
             resposta.addProperty("status", "success");
+            resposta.addProperty("invoice_date", dataDaNota);
             resposta.add("items", produtos);
             response.getWriter().write(gson.toJson(resposta));
 
